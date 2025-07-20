@@ -8,6 +8,7 @@ from aida.tests.base import test_registry, TestResult
 # Import test suites to register them
 from aida.tests.integration.test_llm import LLMTestSuite
 from aida.tests.integration.test_orchestrator import OrchestratorTestSuite
+from aida.tests.integration.test_chat_cli import ChatCLITestSuite
 
 
 class AIDATestRunner:

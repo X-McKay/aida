@@ -19,6 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Auto-save sessions with restoration capability
   - Progress indicators for long-running operations
 - Creative feature roadmap document inspired by Claude Code and Gemini CLI research
+- **CHAT CLI INTEGRATION TESTS**: Comprehensive test suite without hardcoding
+  - Test questions for no-tools, single-tool, and multi-tool scenarios
+  - Automated test runner with real orchestrator execution
+  - Test strategy document ensuring no hardcoded responses
+  - 45 diverse test questions covering various use cases
+  - Edge case testing for ambiguous tool selection
+  - Performance and tool usage metrics tracking
 - New simplified LLM system with PydanticAI integration
 - Purpose-based LLM routing (DEFAULT, CODING, REASONING, MULTIMODAL, QUICK)
 - Unified model interface supporting Ollama, OpenAI, Anthropic, and vLLM providers
