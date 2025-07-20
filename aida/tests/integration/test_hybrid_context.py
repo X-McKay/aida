@@ -5,6 +5,7 @@ import json
 import tempfile
 from typing import Dict, Any, List
 from pathlib import Path
+from datetime import datetime
 
 from aida.tests.base import BaseTestSuite, TestResult, test_registry
 from aida.tools.context import ContextTool
@@ -19,16 +20,17 @@ class HybridContextTestSuite(BaseTestSuite):
     def __init__(self, verbose: bool = False, persist_files: bool = False):
         super().__init__("Hybrid ContextTool", verbose, persist_files)
         self.tool = ContextTool()
-        self.test_content = """
-        This is a long conversation about implementing AI tools and context management.
-        We discussed important architectural decisions including the use of hybrid patterns.
-        The main requirement is to support multiple frameworks like PydanticAI and MCP.
-        Critical information: The system must maintain backward compatibility.
-        Key decision: We will use a unified interface for all tools.
-        Action item: Implement comprehensive testing for all interfaces.
-        Recent update: Added support for OpenTelemetry observability.
-        This additional content helps test compression and summarization features.
-        """
+        self.test_content = """This is a long conversation about implementing AI tools and context management.
+We discussed important architectural decisions including the use of hybrid patterns.
+
+The main requirement is to support multiple frameworks like PydanticAI and MCP.
+Critical information: The system must maintain backward compatibility.
+
+Key decision: We will use a unified interface for all tools.
+Action item: Implement comprehensive testing for all interfaces.
+
+Recent update: Added support for OpenTelemetry observability.
+This additional content helps test compression and summarization features."""
     
     async def test_core_interface_compress(self) -> Dict[str, Any]:
         """Test core interface with compression operation."""
@@ -37,8 +39,8 @@ class HybridContextTestSuite(BaseTestSuite):
         result = await self.tool.execute(
             operation="compress",
             content=self.test_content,
-            compression_ratio=0.5,
-            preserve_priority="important"
+            compression_level="moderate",
+            priority="importance"
         )
         
         if result.status != ToolStatus.COMPLETED:
@@ -67,7 +69,7 @@ class HybridContextTestSuite(BaseTestSuite):
             operation="summarize",
             content=self.test_content,
             max_tokens=500,
-            format_type="structured"
+            output_format="structured"
         )
         
         if result.status != ToolStatus.COMPLETED:
@@ -80,7 +82,7 @@ class HybridContextTestSuite(BaseTestSuite):
                 "success": True,
                 "message": "Summarization successful",
                 "key_elements": result.result.get("key_elements", {}),
-                "format": result.result.get("format_type")
+                "format": result.result.get("output_format")
             }
         else:
             return {
@@ -97,10 +99,9 @@ class HybridContextTestSuite(BaseTestSuite):
         # Test compress_context function
         try:
             result = await tools["compress_context"](
-                ctx=None,  # RunContext not needed for this test
                 content=self.test_content,
-                compression_ratio=0.3,
-                preserve_priority="recent"
+                compression_level="aggressive",
+                priority="recency"
             )
             
             if "compressed_content" in result and "compression_stats" in result:
@@ -129,8 +130,8 @@ class HybridContextTestSuite(BaseTestSuite):
         mcp_server = self.tool.get_mcp_server()
         
         # List available tools
-        tools = mcp_server.list_tools()
-        tool_names = [t.name for t in tools]
+        tools = await mcp_server.list_tools()
+        tool_names = [t["name"] for t in tools]
         
         if "context_compress" not in tool_names:
             return {
@@ -148,8 +149,8 @@ class HybridContextTestSuite(BaseTestSuite):
             }
         )
         
-        if result.isError:
-            error_text = result.content[0].text if result.content else "Unknown error"
+        if result.get("isError", False):
+            error_text = result.get("content", [{}])[0].get("text", "Unknown error")
             return {
                 "success": False,
                 "message": f"MCP execution error: {error_text}"
@@ -157,7 +158,7 @@ class HybridContextTestSuite(BaseTestSuite):
         
         # Parse the JSON response from content
         import json
-        response_text = result.content[0].text if result.content else "{}"
+        response_text = result.get("content", [{}])[0].get("text", "{}") if isinstance(result, dict) else "{}"
         try:
             response_data = json.loads(response_text)
         except json.JSONDecodeError:
@@ -167,7 +168,7 @@ class HybridContextTestSuite(BaseTestSuite):
             return {
                 "success": True,
                 "message": "MCP interface working",
-                "format_type": response_data.get("format_type")
+                "output_format": response_data.get("output_format")
             }
         else:
             return {
@@ -228,7 +229,7 @@ class HybridContextTestSuite(BaseTestSuite):
         result = await self.tool.execute(
             operation="extract_key_points",
             content=self.test_content,
-            max_tokens=5  # Using max_tokens as max_points
+            max_results=5
         )
         
         if result.status != ToolStatus.COMPLETED:
@@ -283,9 +284,9 @@ class HybridContextTestSuite(BaseTestSuite):
         self.log("Testing context search")
         
         result = await self.tool.execute(
-            operation="search_context",
+            operation="search",
             content=self.test_content,
-            search_query="hybrid patterns"
+            query="hybrid patterns"
         )
         
         if result.status != ToolStatus.COMPLETED:
@@ -313,15 +314,16 @@ class HybridContextTestSuite(BaseTestSuite):
             "metadata": {"timestamp": "2024-01-01"}
         }
         
-        # Create snapshot
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-            snapshot_path = f.name
+        # Create snapshot in .aida directory
+        snapshot_dir = Path(".aida/test_snapshots")
+        snapshot_dir.mkdir(parents=True, exist_ok=True)
+        snapshot_path = str(snapshot_dir / f"test_snapshot_{datetime.now().timestamp()}.json")
         
         try:
             # Create snapshot
             create_result = await self.tool.execute(
-                operation="create_snapshot",
-                context_data=context_data,
+                operation="snapshot",
+                content=json.dumps(context_data),
                 file_path=snapshot_path
             )
             
@@ -330,7 +332,7 @@ class HybridContextTestSuite(BaseTestSuite):
             
             # Restore snapshot
             restore_result = await self.tool.execute(
-                operation="restore_snapshot",
+                operation="restore",
                 file_path=snapshot_path
             )
             
@@ -338,6 +340,10 @@ class HybridContextTestSuite(BaseTestSuite):
                 return {"success": False, "message": f"Snapshot restore failed: {restore_result.error}"}
             
             restored_data = restore_result.result.get("restored_context", {})
+            
+            self.log(f"Original data: {context_data}")
+            self.log(f"Restored data: {restored_data}")
+            self.log(f"Restore result: {restore_result.result}")
             
             if restored_data == context_data:
                 return {
@@ -348,7 +354,9 @@ class HybridContextTestSuite(BaseTestSuite):
             else:
                 return {
                     "success": False,
-                    "message": "Restored data doesn't match original"
+                    "message": "Restored data doesn't match original",
+                    "original": context_data,
+                    "restored": restored_data
                 }
                 
         finally:
@@ -363,9 +371,9 @@ class HybridContextTestSuite(BaseTestSuite):
         long_content = self.test_content * 10  # Make it longer
         
         result = await self.tool.execute(
-            operation="split_context",
+            operation="split",
             content=long_content,
-            max_tokens=50
+            max_results=10  # Use max_results instead of max_chunks
         )
         
         if result.status != ToolStatus.COMPLETED:
@@ -373,6 +381,11 @@ class HybridContextTestSuite(BaseTestSuite):
         
         chunks = result.result.get("chunks", [])
         chunk_metadata = result.result.get("chunk_metadata", [])
+        
+        self.log(f"Split result: {result.result}")
+        self.log(f"Chunks count: {len(chunks)}")
+        self.log(f"Chunk metadata count: {len(chunk_metadata)}")
+        self.log(f"First chunk (if any): {chunks[0][:100] if chunks else 'No chunks'}")
         
         if len(chunks) > 1 and len(chunks) == len(chunk_metadata):
             return {
@@ -385,7 +398,10 @@ class HybridContextTestSuite(BaseTestSuite):
         else:
             return {
                 "success": False,
-                "message": "Context not properly split"
+                "message": "Context not properly split",
+                "chunks_found": len(chunks),
+                "metadata_found": len(chunk_metadata),
+                "needed": "> 1 chunks with matching metadata"
             }
     
     async def run_all(self) -> List[TestResult]:

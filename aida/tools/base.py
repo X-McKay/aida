@@ -421,16 +421,17 @@ async def initialize_default_tools() -> ToolRegistry:
     from aida.tools.system import SystemTool
     from aida.tools.context import ContextTool
     from aida.tools.llm_response import LLMResponseTool
+    from aida.tools.thinking import ThinkingTool
     
     # Create and register all tools
-    # NOTE: Removed non-refactored tools (thinking, maintenance, project, architecture)
-    # to meet deadline. These can be added back later if needed.
+    # NOTE: Thinking tool has been refactored to hybrid architecture
     tools = [
         ExecutionTool(),
         FileOperationsTool(),
         SystemTool(),
         ContextTool(),
         LLMResponseTool(),
+        ThinkingTool(),
     ]
     
     for tool in tools:

@@ -66,7 +66,7 @@ class HybridFileOperationsTestSuite(BaseTestSuite):
         try:
             # Test read operation
             result = await self.tool.execute(
-                operation="read_file",
+                operation="read",
                 path=str(self.test_files["simple.txt"])
             )
             
@@ -82,7 +82,7 @@ class HybridFileOperationsTestSuite(BaseTestSuite):
             # Test write operation
             new_content = "Updated content from AIDA interface"
             write_result = await self.tool.execute(
-                operation="write_file",
+                operation="write",
                 path=str(self.test_files["simple.txt"]),
                 content=new_content
             )
@@ -92,7 +92,7 @@ class HybridFileOperationsTestSuite(BaseTestSuite):
             
             # Verify write
             verify_result = await self.tool.execute(
-                operation="read_file",
+                operation="read",
                 path=str(self.test_files["simple.txt"])
             )
             assert verify_result.result["content"] == new_content
@@ -100,7 +100,7 @@ class HybridFileOperationsTestSuite(BaseTestSuite):
             return {
                 "success": True,
                 "message": "AIDA interface works correctly",
-                "operations_tested": ["read_file", "write_file"],
+                "operations_tested": ["read", "write"],
                 "metadata_verified": True,
                 "duration_tracking": True
             }
@@ -116,7 +116,7 @@ class HybridFileOperationsTestSuite(BaseTestSuite):
             pydantic_tools = self.tool.to_pydantic_tools()
             
             # Verify expected tools are available
-            expected_tools = ["read_file", "write_file", "create_directory", "list_files"]
+            expected_tools = ["read_file", "write_file", "list_directory", "search_files", "find_files"]
             for tool_name in expected_tools:
                 assert tool_name in pydantic_tools, f"Missing PydanticAI tool: {tool_name}"
             
@@ -141,10 +141,11 @@ class HybridFileOperationsTestSuite(BaseTestSuite):
             
             assert "bytes_written" in write_result
             assert write_result["bytes_written"] > 0
+            assert test_file.exists()
             
             # Test directory creation
             new_dir = Path(self.temp_dir) / "pydantic_dir"
-            dir_result = await pydantic_tools["create_directory"](str(new_dir))
+            dir_result = await pydantic_tools["create_dir"](str(new_dir))
             assert dir_result["created"] is True
             assert new_dir.exists()
             
@@ -174,8 +175,11 @@ class HybridFileOperationsTestSuite(BaseTestSuite):
             test_content = "MCP server test content"
             mcp_test_file = Path(self.temp_dir) / "mcp_test.txt"
             
+            self.log(f"Test directory: {self.temp_dir}")
+            self.log(f"Test file path: {mcp_test_file}")
+            
             # Write using MCP interface
-            write_result = await mcp_server.call_tool("file_write_file", {
+            write_result = await mcp_server.call_tool("file_operations_write", {
                 "path": str(mcp_test_file),
                 "content": test_content
             })
@@ -184,37 +188,84 @@ class HybridFileOperationsTestSuite(BaseTestSuite):
             assert not write_result.get("isError"), f"MCP write failed: {write_result}"
             assert "content" in write_result
             
+            # Verify file was actually created
+            assert mcp_test_file.exists(), f"File was not created: {mcp_test_file}"
+            
             # Read using MCP interface
-            read_result = await mcp_server.call_tool("file_read_file", {
+            read_result = await mcp_server.call_tool("file_operations_read", {
                 "path": str(mcp_test_file)
             })
             
             assert not read_result.get("isError"), f"MCP read failed: {read_result}"
             
             # Parse MCP response structure
+            if read_result.get("isError"):
+                self.log(f"Read operation failed: {read_result}")
+                raise Exception(f"MCP read error: {read_result}")
+                
+            assert "content" in read_result, f"No content in read result: {read_result}"
+            assert len(read_result["content"]) > 0, f"Empty content list: {read_result}"
+            assert "text" in read_result["content"][0], f"No text in content: {read_result['content'][0]}"
+            
             content_data = read_result["content"][0]["text"]
-            parsed_data = json.loads(content_data)
-            assert parsed_data["content"] == test_content
+            self.log(f"Raw MCP response: {repr(content_data[:100])}...")
+            
+            # The response is already JSON serialized file content
+            try:
+                if not content_data:
+                    raise ValueError("Empty content data received")
+                    
+                if content_data.startswith('{'):
+                    # New format: returns dict with content and metadata
+                    parsed_data = json.loads(content_data)
+                    assert parsed_data["content"] == test_content
+                else:
+                    # Old format: returns just the content
+                    assert content_data == test_content
+            except (json.JSONDecodeError, ValueError) as e:
+                self.log(f"Failed to parse content: {e}")
+                self.log(f"Raw content: {repr(content_data)}")
+                self.log(f"Content length: {len(content_data)}")
+                raise
             
             # Test directory listing via MCP
-            list_result = await mcp_server.call_tool("file_list_files", {
+            list_result = await mcp_server.call_tool("file_operations_list", {
                 "path": self.temp_dir
             })
             
-            assert not list_result.get("isError")
-            list_content = json.loads(list_result["content"][0]["text"])
-            assert "files" in list_content
+            assert not list_result.get("isError"), f"MCP list failed: {list_result}"
+            
+            # Debug the list response
+            assert "content" in list_result, f"No content in list result: {list_result}"
+            assert len(list_result["content"]) > 0, f"Empty content in list result: {list_result}"
+            
+            list_content_text = list_result["content"][0]["text"]
+            self.log(f"List response text: {repr(list_content_text[:100])}...")
+            
+            # The list operation returns an array of file entries
+            try:
+                if not list_content_text:
+                    raise ValueError("Empty list content received")
+                list_content = json.loads(list_content_text)
+                assert isinstance(list_content, list), "Expected list of files"
+                assert len(list_content) > 0, "Directory should not be empty"
+            except (json.JSONDecodeError, ValueError) as e:
+                self.log(f"Failed to parse list content: {e}")
+                self.log(f"Raw list content: {repr(list_content_text)}")
+                self.log(f"List content length: {len(list_content_text)}")
+                raise
             
             return {
                 "success": True,
                 "message": "MCP server integration working",
-                "mcp_tools_tested": ["file_write_file", "file_read_file", "file_list_files"],
+                "mcp_tools_tested": ["file_operations_write", "file_operations_read", "file_operations_list"],
                 "response_format": "MCP compatible",
                 "external_compatibility": True
             }
             
         except Exception as e:
-            return {"success": False, "message": f"MCP server test failed: {e}"}
+            import traceback
+            return {"success": False, "message": f"MCP server test failed: {e}", "traceback": traceback.format_exc()}
     
     async def test_observability_integration(self) -> Dict[str, Any]:
         """Test OpenTelemetry observability."""
@@ -235,7 +286,7 @@ class HybridFileOperationsTestSuite(BaseTestSuite):
             with observability.trace_operation("test_trace", path=str(test_file)):
                 # Perform file operation within trace
                 result = await self.tool.execute(
-                    operation="write_file",
+                    operation="write",
                     path=str(test_file),
                     content="Traced operation content"
                 )
@@ -264,7 +315,7 @@ class HybridFileOperationsTestSuite(BaseTestSuite):
             # 1. Create with AIDA interface
             aida_content = "Created with AIDA"
             aida_result = await self.tool.execute(
-                operation="write_file",
+                operation="write",
                 path=str(test_file),
                 content=aida_content
             )
@@ -278,7 +329,7 @@ class HybridFileOperationsTestSuite(BaseTestSuite):
             # 3. Update with MCP interface
             mcp_server = self.tool.get_mcp_server()
             mcp_content = "Updated with MCP"
-            mcp_result = await mcp_server.call_tool("file_write_file", {
+            mcp_result = await mcp_server.call_tool("file_operations_write", {
                 "path": str(test_file),
                 "content": mcp_content
             })
@@ -286,7 +337,7 @@ class HybridFileOperationsTestSuite(BaseTestSuite):
             
             # 4. Verify with AIDA interface
             verify_result = await self.tool.execute(
-                operation="read_file",
+                operation="read",
                 path=str(test_file)
             )
             assert verify_result.status == "completed"
@@ -294,7 +345,7 @@ class HybridFileOperationsTestSuite(BaseTestSuite):
             
             # 5. Test concurrent access (simplified)
             concurrent_tasks = [
-                self.tool.execute(operation="read_file", path=str(test_file)),
+                self.tool.execute(operation="read", path=str(test_file)),
                 pydantic_tools["read_file"](str(test_file))
             ]
             
@@ -331,7 +382,7 @@ class HybridFileOperationsTestSuite(BaseTestSuite):
             start_time = time.time()
             for _ in range(10):
                 await self.tool.execute(
-                    operation="write_file",
+                    operation="write",
                     path=str(test_file),
                     content=test_content
                 )

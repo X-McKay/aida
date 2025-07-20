@@ -504,6 +504,16 @@ class ChatSession:
                         logger.debug(f"llm_response result_data type: {type(result_data)}, value: {result_data}")
                         response_parts.append(str(result_data))
                         
+                elif tool_name == "thinking" and isinstance(result_data, dict):
+                    # Handle thinking tool output
+                    if "analysis" in result_data:
+                        response_parts.append(result_data["analysis"])
+                    elif "summary" in result_data:
+                        response_parts.append(result_data["summary"])
+                    else:
+                        # Show structured data
+                        response_parts.append(json.dumps(result_data, indent=2))
+                        
                 else:
                     # Catch-all for any other tools
                     logger.debug(f"Unhandled tool '{tool_name}' with result: {result_data}")

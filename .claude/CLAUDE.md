@@ -82,6 +82,8 @@ This document contains critical information about working with this codebase. Fo
 
 - Make sure to follow appropriate protocols where appropriate: A2A for Agents, and MCP for tools
 - DO NOT hard-code ANY solutions to specific questions or tests
+- DO NOT back-up old files or worry about backward compatibility. This system has not been released, so prioritize deletion of stale and excess code and eliminating technical debt
+- NEVER create, modify, or delete, files outside of the project directory, and use .aida/ in-place of /tmp/
 
 ## Core Components
 

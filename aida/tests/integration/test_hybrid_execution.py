@@ -32,16 +32,11 @@ class HybridExecutionTestSuite(BaseTestSuite):
         if result.status != ToolStatus.COMPLETED:
             return {"success": False, "message": f"Execution failed: {result.error}"}
         
-        # Check if fallback mode is being used
-        if result.metadata.get("fallback", False):
-            self.log("⚠️ Using fallback mode (Dagger not available)")
-            return {
-                "success": True,
-                "message": "Execution completed in fallback mode",
-                "fallback": True
-            }
         
-        stdout = result.result.get("stdout", "")
+        self.log(f"Result type: {type(result.result)}")
+        self.log(f"Result: {result.result}")
+        
+        stdout = result.result.get("output", result.result.get("stdout", "")) if isinstance(result.result, dict) else ""
         expected_output = "Hello from Python!\n4"
         
         if expected_output in stdout:
@@ -69,14 +64,13 @@ class HybridExecutionTestSuite(BaseTestSuite):
         if result.status != ToolStatus.COMPLETED:
             return {"success": False, "message": f"Execution failed: {result.error}"}
         
-        stdout = result.result.get("stdout", "")
+        stdout = result.result.get("output", result.result.get("stdout", ""))
         
-        if "Hello from Bash!" in stdout or result.metadata.get("fallback", False):
+        if "Hello from Bash!" in stdout:
             return {
                 "success": True,
                 "message": "Bash execution successful",
-                "output": stdout[:100],
-                "fallback": result.metadata.get("fallback", False)
+                "output": stdout[:100]
             }
         else:
             return {
@@ -90,17 +84,23 @@ class HybridExecutionTestSuite(BaseTestSuite):
         
         tools = self.tool.to_pydantic_tools()
         
-        # Test execute_python function
+        # Check available tools
+        if "run_python" not in tools:
+            return {
+                "success": False,
+                "message": f"run_python not in tools. Available: {list(tools.keys())}"
+            }
+        
+        # Test run_python function
         try:
-            result = await tools["execute_python"](
-                ctx=None,  # RunContext not needed for this test
-                code="import sys\nprint(f'Python {sys.version.split()[0]}')",
-                timeout=30
+            result = await tools["run_python"](
+                code="import sys\nprint(f'Python {sys.version.split()[0]}')"
             )
             
-            stdout = result.get("stdout", "")
+            # run_python returns a string directly
+            stdout = result if isinstance(result, str) else result.get("stdout", "")
             
-            if "Python" in stdout or "[Note: Container execution unavailable" in stdout:
+            if "Python" in stdout:
                 return {
                     "success": True,
                     "message": "PydanticAI interface working",
@@ -126,12 +126,12 @@ class HybridExecutionTestSuite(BaseTestSuite):
         
         # List available tools
         tools = mcp_server.list_tools()
-        tool_names = [t.name for t in tools]
+        tool_names = [t["name"] for t in tools]
         
-        if "execution_execute_code" not in tool_names:
+        if "execution_execute" not in tool_names:
             return {
                 "success": False,
-                "message": "MCP tools not properly registered"
+                "message": f"MCP tools not properly registered. Available: {tool_names}"
             }
         
         # Execute Python via MCP
@@ -143,8 +143,8 @@ class HybridExecutionTestSuite(BaseTestSuite):
             }
         )
         
-        if result.isError:
-            error_text = result.content[0].text if result.content else "Unknown error"
+        if result.get("isError", False):
+            error_text = result.get("content", [{}])[0].get("text", "Unknown error")
             return {
                 "success": False,
                 "message": f"MCP execution error: {error_text}"
@@ -152,14 +152,14 @@ class HybridExecutionTestSuite(BaseTestSuite):
         
         # Parse the JSON response from content
         import json
-        response_text = result.content[0].text if result.content else "{}"
+        response_text = result.get("content", [{}])[0].get("text", "{}") if isinstance(result, dict) else "{}"
         try:
             response_data = json.loads(response_text)
-            stdout = response_data.get("stdout", "")
+            stdout = response_data.get("output", response_data.get("stdout", ""))
         except json.JSONDecodeError:
             stdout = response_text
         
-        if "MCP execution test" in stdout or "[Note: Container execution unavailable" in stdout:
+        if "MCP execution test" in stdout:
             return {
                 "success": True,
                 "message": "MCP interface working",
@@ -234,14 +234,13 @@ print(json.dumps(data, indent=2))
         if result.status != ToolStatus.COMPLETED:
             return {"success": False, "message": f"Execution failed: {result.error}"}
         
-        stdout = result.result.get("stdout", "")
+        stdout = result.result.get("output", result.result.get("stdout", ""))
         
-        if "package_test" in stdout or result.metadata.get("fallback", False):
+        if "package_test" in stdout:
             return {
                 "success": True,
                 "message": "Package execution successful",
-                "output": stdout[:100],
-                "fallback": result.metadata.get("fallback", False)
+                "output": stdout[:100]
             }
         else:
             return {
@@ -269,14 +268,13 @@ print(f"File content: {content}")
         if result.status != ToolStatus.COMPLETED:
             return {"success": False, "message": f"Execution failed: {result.error}"}
         
-        stdout = result.result.get("stdout", "")
+        stdout = result.result.get("output", result.result.get("stdout", ""))
         
-        if "Hello from file!" in stdout or result.metadata.get("fallback", False):
+        if "Hello from file!" in stdout:
             return {
                 "success": True,
                 "message": "File execution successful",
-                "output": stdout[:100],
-                "fallback": result.metadata.get("fallback", False)
+                "output": stdout[:100]
             }
         else:
             return {
@@ -299,16 +297,8 @@ print("This should not print")
             timeout=2  # Short timeout
         )
         
-        # In fallback mode, this won't actually timeout
-        if result.metadata.get("fallback", False):
-            return {
-                "success": True,
-                "message": "Timeout test skipped in fallback mode",
-                "fallback": True
-            }
-        
         if result.status == ToolStatus.FAILED:
-            if "timeout" in result.error.lower():
+            if result.error and ("timeout" in result.error.lower() or "timed out" in result.error.lower()):
                 return {
                     "success": True,
                     "message": "Timeout handled correctly",
@@ -318,7 +308,8 @@ print("This should not print")
         return {
             "success": False,
             "message": "Timeout not handled properly",
-            "status": result.status.value
+            "status": result.status.value,
+            "error": result.error
         }
     
     async def test_javascript_execution(self) -> Dict[str, Any]:
@@ -338,14 +329,13 @@ console.log('Result:', result);
         if result.status != ToolStatus.COMPLETED:
             return {"success": False, "message": f"Execution failed: {result.error}"}
         
-        stdout = result.result.get("stdout", "")
+        stdout = result.result.get("output", result.result.get("stdout", ""))
         
-        if "Hello from JavaScript!" in stdout or result.metadata.get("fallback", False):
+        if "Hello from JavaScript!" in stdout:
             return {
                 "success": True,
                 "message": "JavaScript execution successful",
-                "output": stdout[:100],
-                "fallback": result.metadata.get("fallback", False)
+                "output": stdout[:100]
             }
         else:
             return {
