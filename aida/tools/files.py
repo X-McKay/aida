@@ -1,11 +1,11 @@
-"""File operations tool suite for AIDA."""
+"""File operations tool with hybrid architecture."""
 
 import asyncio
 import os
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, Callable
 import json
 import re
 import logging
@@ -18,14 +18,23 @@ logger = logging.getLogger(__name__)
 
 
 class FileOperationsTool(Tool):
-    """Comprehensive file operations tool."""
+    """Comprehensive file operations tool with hybrid architecture.
+    
+    Supports:
+    - PydanticAI tool compatibility
+    - MCP server integration
+    - OpenTelemetry observability
+    """
     
     def __init__(self):
         super().__init__(
             name="file_operations",
             description="Comprehensive file and directory operations with search and editing capabilities",
-            version="1.0.0"
+            version="2.0.0"
         )
+        self._pydantic_tools_cache = {}
+        self._mcp_server = None
+        self._observability = None
     
     def get_capability(self) -> ToolCapability:
         return ToolCapability(
@@ -556,3 +565,279 @@ class FileOperationsTool(Tool):
                 "type": "unknown",
                 "error": str(e)
             }
+    
+    # ============================================================================
+    # HYBRID ARCHITECTURE METHODS
+    # ============================================================================
+    
+    def to_pydantic_tools(self, agent=None) -> Dict[str, Callable]:
+        """Convert to PydanticAI-compatible tool functions.
+        
+        Args:
+            agent: PydanticAI agent instance (optional, for caching)
+            
+        Returns:
+            Dictionary of tool functions that can be registered with PydanticAI
+        """
+        if agent and id(agent) in self._pydantic_tools_cache:
+            return self._pydantic_tools_cache[id(agent)]
+        
+        # Create individual tool functions for each operation
+        tools = {}
+        
+        async def read_file(path: str, encoding: str = "utf-8") -> Dict[str, Any]:
+            """Read content from a file."""
+            result = await self.execute(operation="read_file", path=path, encoding=encoding)
+            return result.result
+        
+        async def write_file(path: str, content: str, encoding: str = "utf-8", backup: bool = True) -> Dict[str, Any]:
+            """Write content to a file."""
+            result = await self.execute(operation="write_file", path=path, content=content, encoding=encoding, backup=backup)
+            return result.result
+        
+        async def list_files(path: str, pattern: str = "*", recursive: bool = False) -> Dict[str, Any]:
+            """List files in a directory."""
+            result = await self.execute(operation="list_files", path=path, pattern=pattern, recursive=recursive)
+            return result.result
+        
+        async def search_files(path: str, search_query: str, pattern: str = "*", recursive: bool = False) -> Dict[str, Any]:
+            """Search for content in files."""
+            result = await self.execute(operation="search_files", path=path, search_query=search_query, pattern=pattern, recursive=recursive)
+            return result.result
+        
+        async def create_directory(path: str) -> Dict[str, Any]:
+            """Create a directory."""
+            result = await self.execute(operation="create_directory", path=path)
+            return result.result
+        
+        async def delete_file(path: str) -> Dict[str, Any]:
+            """Delete a file or directory."""
+            result = await self.execute(operation="delete_file", path=path)
+            return result.result
+        
+        async def copy_file(source_path: str, destination_path: str) -> Dict[str, Any]:
+            """Copy a file or directory."""
+            result = await self.execute(operation="copy_file", path=source_path, destination=destination_path)
+            return result.result
+        
+        async def move_file(source_path: str, destination_path: str) -> Dict[str, Any]:
+            """Move a file or directory."""
+            result = await self.execute(operation="move_file", path=source_path, destination=destination_path)
+            return result.result
+        
+        async def get_file_info(path: str) -> Dict[str, Any]:
+            """Get detailed information about a file or directory."""
+            result = await self.execute(operation="get_file_info", path=path)
+            return result.result
+        
+        async def find_files(path: str, pattern: str = "*", recursive: bool = False) -> Dict[str, Any]:
+            """Find files matching a pattern."""
+            result = await self.execute(operation="find_files", path=path, pattern=pattern, recursive=recursive)
+            return result.result
+        
+        tools = {
+            "read_file": read_file,
+            "write_file": write_file,
+            "list_files": list_files,
+            "search_files": search_files,
+            "create_directory": create_directory,
+            "delete_file": delete_file,
+            "copy_file": copy_file,
+            "move_file": move_file,
+            "get_file_info": get_file_info,
+            "find_files": find_files,
+        }
+        
+        # Cache for this agent
+        if agent:
+            self._pydantic_tools_cache[id(agent)] = tools
+        
+        return tools
+    
+    def register_with_pydantic_agent(self, agent) -> None:
+        """Register all file operations as individual tools with a PydanticAI agent.
+        
+        Usage:
+            file_tool = FileOperationsTool()
+            file_tool.register_with_pydantic_agent(agent)
+        """
+        tools = self.to_pydantic_tools(agent)
+        
+        # Register each tool function with the agent
+        for tool_name, tool_func in tools.items():
+            # Use agent.tool decorator if available
+            if hasattr(agent, 'tool'):
+                decorated_func = agent.tool(tool_func)
+                setattr(agent, f"_file_{tool_name}", decorated_func)
+            else:
+                logger.warning(f"Agent does not have 'tool' decorator method. Cannot register {tool_name}")
+    
+    def get_mcp_server(self):
+        """Get or create MCP server wrapper for this tool.
+        
+        Returns:
+            MCP server instance that exposes file operations
+        """
+        if self._mcp_server is None:
+            self._mcp_server = FileOperationsMCPServer(self)
+        return self._mcp_server
+    
+    def enable_observability(self, config: Optional[Dict[str, Any]] = None):
+        """Enable OpenTelemetry observability for file operations.
+        
+        Args:
+            config: Optional configuration for observability setup
+        """
+        if self._observability is None:
+            self._observability = FileOperationsObservability(self, config or {})
+        return self._observability
+
+
+class FileOperationsMCPServer:
+    """MCP server wrapper for FileOperationsTool.
+    
+    Provides Model Context Protocol compatible interface for file operations.
+    """
+    
+    def __init__(self, file_tool: FileOperationsTool):
+        self.file_tool = file_tool
+        self.server_info = {
+            "name": "aida-file-operations",
+            "version": file_tool.version,
+            "description": file_tool.description
+        }
+    
+    async def list_tools(self) -> List[Dict[str, Any]]:
+        """List available MCP tools."""
+        capability = self.file_tool.get_capability()
+        
+        # Convert each operation to an MCP tool
+        operations = [
+            "read_file", "write_file", "list_files", "search_files",
+            "create_directory", "delete_file", "copy_file", "move_file",
+            "get_file_info", "find_files"
+        ]
+        
+        tools = []
+        for op in operations:
+            tools.append({
+                "name": f"file_{op}",
+                "description": f"File operation: {op.replace('_', ' ').title()}",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": self._get_operation_schema(op),
+                    "required": self._get_required_params(op)
+                }
+            })
+        
+        return tools
+    
+    def _get_operation_schema(self, operation: str) -> Dict[str, Any]:
+        """Get JSON schema for operation parameters."""
+        base_props = {
+            "path": {
+                "type": "string",
+                "description": "File or directory path"
+            }
+        }
+        
+        if operation in ["write_file", "edit_file"]:
+            base_props["content"] = {
+                "type": "string", 
+                "description": "Content to write"
+            }
+        
+        if operation == "search_files":
+            base_props["search_query"] = {
+                "type": "string",
+                "description": "Search query"
+            }
+        
+        if operation in ["copy_file", "move_file"]:
+            base_props["destination"] = {
+                "type": "string",
+                "description": "Destination path"
+            }
+        
+        return base_props
+    
+    def _get_required_params(self, operation: str) -> List[str]:
+        """Get required parameters for operation."""
+        required = ["path"]
+        
+        if operation in ["write_file", "search_files"]:
+            required.append("content" if operation == "write_file" else "search_query")
+        
+        if operation in ["copy_file", "move_file"]:
+            required.append("destination")
+        
+        return required
+    
+    async def call_tool(self, name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Handle MCP tool call."""
+        # Extract operation from tool name (remove 'file_' prefix)
+        operation = name.replace("file_", "")
+        
+        try:
+            result = await self.file_tool.execute(operation=operation, **arguments)
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": json.dumps(result.result, indent=2)
+                    }
+                ]
+            }
+        except Exception as e:
+            return {
+                "content": [
+                    {
+                        "type": "text", 
+                        "text": f"Error: {str(e)}"
+                    }
+                ],
+                "isError": True
+            }
+
+
+class FileOperationsObservability:
+    """OpenTelemetry observability for file operations."""
+    
+    def __init__(self, file_tool: FileOperationsTool, config: Dict[str, Any]):
+        self.file_tool = file_tool
+        self.config = config
+        self.enabled = config.get("enabled", True)
+        
+        if self.enabled:
+            self._setup_tracing()
+    
+    def _setup_tracing(self):
+        """Setup OpenTelemetry tracing."""
+        try:
+            # Import OpenTelemetry components
+            from opentelemetry import trace
+            from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+            from opentelemetry.sdk.trace import TracerProvider
+            from opentelemetry.sdk.trace.export import BatchSpanProcessor
+            
+            # Setup tracer
+            self.tracer = trace.get_tracer(__name__)
+            logger.debug("OpenTelemetry tracing enabled for file operations")
+        except ImportError:
+            logger.warning("OpenTelemetry not available. Install with: pip install opentelemetry-api opentelemetry-sdk")
+            self.enabled = False
+    
+    def trace_operation(self, operation: str, **kwargs):
+        """Create a trace span for file operation."""
+        if not self.enabled:
+            return None
+        
+        return self.tracer.start_span(
+            f"file_operation.{operation}",
+            attributes={
+                "file.operation": operation,
+                "file.path": kwargs.get("path", "unknown"),
+                "tool.name": self.file_tool.name,
+                "tool.version": self.file_tool.version
+            }
+        )

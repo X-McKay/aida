@@ -361,7 +361,7 @@ class MaintenanceTool(Tool):
         await asyncio.sleep(0.1)
         
         if not backup_path:
-            backup_path = f"/tmp/aida_backup_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+            backup_path = f".aida/backups/backup_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
         
         backup_path = Path(backup_path)
         backup_path.mkdir(parents=True, exist_ok=True)

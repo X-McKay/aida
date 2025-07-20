@@ -10,6 +10,7 @@ This document contains critical information about working with this codebase. Fo
 
 1. Package Management
    - ONLY use uv, NEVER pip
+   - ONLY use typer for CLIs, never click
    - Installation: `uv add package`
    - Running tools: `uv run tool`
    - Upgrading: `uv add --dev package --upgrade-package package`

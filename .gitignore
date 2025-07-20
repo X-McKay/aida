@@ -67,3 +67,9 @@ debug_*.py
 test_*.py
 *_test.py
 sample_*.txt
+.aida/
+
+# Exception: Include legitimate test files in test directories
+!aida/tests/**/test_*.py
+!tests/**/test_*.py
+!**/tests/**/test_*.py

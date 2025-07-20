@@ -25,8 +25,9 @@ from aida.cli.commands.agent import agent_app
 from aida.cli.commands.config import config_app
 from aida.cli.commands.llm import llm_app
 from aida.cli.commands.system import system_app
-from aida.cli.commands.interactive import interactive_app
+from aida.cli.commands.chat import chat_app
 from aida.cli.commands.tools import tools_app
+from aida.cli.commands.test import test_app
 from aida.cli.ui import setup_console
 
 
@@ -43,8 +44,9 @@ app.add_typer(agent_app, name="agent", help="Agent management commands")
 app.add_typer(config_app, name="config", help="Configuration management")
 app.add_typer(llm_app, name="llm", help="LLM provider management")
 app.add_typer(system_app, name="system", help="System administration")
-app.add_typer(interactive_app, name="interactive", help="Interactive mode")
+app.add_typer(chat_app, name="chat", help="Chat with AIDA")
 app.add_typer(tools_app, name="tools", help="Tool management and execution")
+app.add_typer(test_app, name="test", help="Integration testing for refactored components")
 
 # Setup console
 console = setup_console()
@@ -104,8 +106,8 @@ def quick_start():
    aida tools init
    aida config init
 
-[yellow]2. Start Interactive Mode[/yellow]
-   aida interactive
+[yellow]2. Start Chat Mode[/yellow]
+   aida chat
 
 [yellow]3. Use Tools Directly[/yellow]
    aida tools list
@@ -284,7 +286,7 @@ This project was initialized with AIDA (Advanced Intelligent Distributed Agent S
 
 3. Start AIDA:
    ```bash
-   aida interactive
+   aida chat
    ```
 
 ## Project Structure
@@ -316,7 +318,7 @@ For more information, visit: https://aida-docs.org
     console.print(f"\n[yellow]Next steps:[/yellow]")
     console.print(f"1. cd {directory}")
     console.print(f"2. aida config validate")
-    console.print(f"3. aida interactive")
+    console.print(f"3. aida chat")
 
 
 @app.callback()
