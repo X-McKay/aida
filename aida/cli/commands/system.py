@@ -2,11 +2,10 @@
 
 import asyncio
 from pathlib import Path
-from typing import Optional
 
-import typer
-from rich.table import Table
 from rich.panel import Panel
+from rich.table import Table
+import typer
 
 from aida.cli.ui.console import get_console
 
@@ -18,7 +17,7 @@ console = get_console()
 def status():
     """Show system status."""
     console.print("[yellow]Checking system status...[/yellow]")
-    
+
     components = [
         ("Core System", "✅ Running", "All modules loaded"),
         ("Agent Framework", "✅ Ready", "3 agents registered"),
@@ -28,15 +27,15 @@ def status():
         ("Memory System", "✅ Ready", "Memory management active"),
         ("Security", "✅ Enabled", "Sandbox and audit active"),
     ]
-    
+
     table = Table(title="AIDA System Status")
     table.add_column("Component", style="cyan")
     table.add_column("Status", style="green")
     table.add_column("Details", style="dim")
-    
+
     for component, status, details in components:
         table.add_row(component, status, details)
-    
+
     console.print(table)
 
 
@@ -44,14 +43,14 @@ def status():
 def logs(
     follow: bool = typer.Option(False, "--follow", "-f", help="Follow log output"),
     lines: int = typer.Option(20, "--lines", "-n", help="Number of lines to show"),
-    level: Optional[str] = typer.Option(None, "--level", "-l", help="Log level filter")
+    level: str | None = typer.Option(None, "--level", "-l", help="Log level filter"),
 ):
     """Show system logs."""
     console.print(f"[yellow]Showing last {lines} log entries...[/yellow]")
-    
+
     if level:
         console.print(f"Filtering by level: {level}")
-    
+
     # Mock log entries
     log_entries = [
         "2025-01-19 10:30:15 - aida.core.agent - INFO - Agent 'interactive_agent' started",
@@ -60,10 +59,10 @@ def logs(
         "2025-01-19 10:30:18 - aida.core.events - DEBUG - Event bus started",
         "2025-01-19 10:30:19 - aida.tools.execution - INFO - Tool 'execution' executed successfully",
     ]
-    
+
     for entry in log_entries[-lines:]:
         console.print(f"[dim]{entry}[/dim]")
-    
+
     if follow:
         console.print("\n[yellow]Following logs... (Press Ctrl+C to exit)[/yellow]")
         try:
@@ -78,7 +77,7 @@ def logs(
 def health():
     """Run system health check."""
     console.print("[yellow]Running system health check...[/yellow]")
-    
+
     async def _health_check():
         checks = [
             ("Core Components", "Checking core system modules..."),
@@ -88,14 +87,14 @@ def health():
             ("Network", "Testing network connectivity..."),
             ("Resources", "Checking system resources..."),
         ]
-        
+
         for check_name, description in checks:
             console.print(f"[dim]{description}[/dim]")
             await asyncio.sleep(0.5)
             console.print(f"[green]✅ {check_name}: OK[/green]")
-        
+
         console.print("\n[success]🎉 System health check passed![/success]")
-    
+
     try:
         asyncio.run(_health_check())
     except KeyboardInterrupt:
@@ -106,7 +105,7 @@ def health():
 def restart():
     """Restart AIDA system."""
     console.print("[yellow]Restarting AIDA system...[/yellow]")
-    
+
     async def _restart():
         console.print("Stopping agents...")
         await asyncio.sleep(1)
@@ -115,7 +114,7 @@ def restart():
         console.print("Starting system...")
         await asyncio.sleep(1)
         console.print("[success]✅ System restarted successfully[/success]")
-    
+
     try:
         asyncio.run(_restart())
     except KeyboardInterrupt:
@@ -124,26 +123,26 @@ def restart():
 
 @system_app.command()
 def backup(
-    output_dir: Optional[Path] = typer.Option(None, "--output", "-o", help="Backup output directory")
+    output_dir: Path | None = typer.Option(None, "--output", "-o", help="Backup output directory"),
 ):
     """Create system backup."""
     if not output_dir:
         output_dir = Path.cwd() / "aida_backup"
-    
+
     console.print(f"[yellow]Creating backup in: {output_dir}[/yellow]")
-    
+
     backup_items = [
         "Configuration files",
-        "Agent definitions", 
+        "Agent definitions",
         "Tool configurations",
         "LLM provider settings",
         "System logs",
         "State data",
     ]
-    
+
     for item in backup_items:
         console.print(f"[dim]Backing up {item}...[/dim]")
-    
+
     console.print(f"[success]✅ Backup created: {output_dir}[/success]")
 
 
@@ -151,18 +150,18 @@ def backup(
 def cleanup():
     """Clean up system resources."""
     console.print("[yellow]Cleaning up system resources...[/yellow]")
-    
+
     cleanup_tasks = [
         ("Temporary files", "245 MB freed"),
         ("Log rotation", "12 old logs archived"),
         ("Cache cleanup", "128 MB freed"),
         ("Memory optimization", "64 MB freed"),
     ]
-    
+
     for task, result in cleanup_tasks:
         console.print(f"[dim]{task}...[/dim]")
         console.print(f"[green]✅ {result}[/green]")
-    
+
     console.print("\n[success]🧹 System cleanup completed![/success]")
 
 
@@ -189,7 +188,7 @@ def version():
 • rich: 13.0.0
 • pydantic: 2.5.0
 """
-    
+
     console.print(Panel(version_info.strip(), title="Version Information", border_style="blue"))
 
 

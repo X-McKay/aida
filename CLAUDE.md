@@ -41,7 +41,7 @@ All tools follow hybrid architecture pattern supporting:
 ### Development
 ```bash
 # Run smoke tests (ALWAYS run these first)
-uv run python smoke_test.py
+uv run python tests/scripts/smoke_test.py
 
 # Start chat
 uv run aida chat
@@ -88,7 +88,7 @@ ollama pull llama3.2:latest
 aida/
 ├── cli/              # CLI interface
 │   └── commands/     # CLI commands (chat, test, etc.)
-├── core/            
+├── core/
 │   └── orchestrator/ # TodoOrchestrator (main brain)
 ├── tools/           # Hybrid architecture tools
 ├── llm/             # LLM management

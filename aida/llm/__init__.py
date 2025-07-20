@@ -1,8 +1,10 @@
 """Simple LLM interface for AIDA."""
 
-from typing import Union, AsyncGenerator
+from collections.abc import AsyncGenerator
+
+from aida.config.llm_profiles import Purpose
+
 from .manager import LLMManager
-from ..config.llm_profiles import Purpose
 
 # Global manager instance
 _manager: LLMManager = None
@@ -17,9 +19,7 @@ def get_llm() -> LLMManager:
 
 
 async def chat(
-    message: str, 
-    purpose: Purpose = Purpose.DEFAULT,
-    stream: bool = False
-) -> Union[str, AsyncGenerator[str, None]]:
+    message: str, purpose: Purpose = Purpose.DEFAULT, stream: bool = False
+) -> str | AsyncGenerator[str, None]:
     """Simple chat interface."""
     return await get_llm().chat(message, purpose, stream)

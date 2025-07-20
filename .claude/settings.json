@@ -1,7 +1,7 @@
 {
   "project_name": "AIDA",
   "description": "Advanced Intelligent Distributed Agent System",
-  
+
   "hooks": [
     {
       "name": "Pre-edit Import Check",
@@ -27,7 +27,7 @@
       ]
     }
   ],
-  
+
   "allowed_tools": [
     "file_read",
     "file_write",
@@ -36,7 +36,7 @@
     "grep",
     "find"
   ],
-  
+
   "quick_actions": {
     "test": "uv run python smoke_test.py",
     "chat": "uv run aida chat",

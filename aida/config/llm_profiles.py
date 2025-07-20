@@ -1,22 +1,25 @@
 """LLM profiles with purpose-based configurations."""
 
 from enum import Enum
-from typing import Optional
+
 from pydantic import BaseModel
+
 from .models import ModelSpec, Provider
 
 
 class Purpose(str, Enum):
     """LLM usage purposes."""
+
     DEFAULT = "default"
     CODING = "coding"
-    REASONING = "reasoning" 
+    REASONING = "reasoning"
     MULTIMODAL = "multimodal"
     QUICK = "quick"
 
 
 class LLMProfile(BaseModel):
     """LLM profile for a specific purpose."""
+
     purpose: Purpose
     model: ModelSpec
     prompt: str
@@ -33,15 +36,12 @@ DEFAULT_PROFILES = {
             max_tokens=16384,
             temperature=0,
         ),
-        prompt="You are AIDA, a helpful AI assistant. Provide clear, accurate responses."
+        prompt="You are AIDA, a helpful AI assistant. Provide clear, accurate responses.",
     ),
-    
     Purpose.CODING: LLMProfile(
         purpose=Purpose.CODING,
         model=ModelSpec(
-            provider=Provider.OLLAMA,
-            model_id="codellama:latest",
-            base_url="http://localhost:11434"
+            provider=Provider.OLLAMA, model_id="codellama:latest", base_url="http://localhost:11434"
         ),
         prompt="""You are AIDA's coding specialist. Write clean, well-documented code.
 
@@ -50,9 +50,8 @@ Guidelines:
 - Include proper error handling
 - Add comments for complex logic
 - Follow best practices for the language
-- Provide complete, runnable examples"""
+- Provide complete, runnable examples""",
     ),
-    
     Purpose.REASONING: LLMProfile(
         purpose=Purpose.REASONING,
         model=ModelSpec(
@@ -69,9 +68,8 @@ Approach:
 - Break down complex problems
 - Explain your reasoning clearly
 - Consider multiple perspectives
-- Provide structured conclusions"""
+- Provide structured conclusions""",
     ),
-    
     Purpose.MULTIMODAL: LLMProfile(
         purpose=Purpose.MULTIMODAL,
         model=ModelSpec(
@@ -86,9 +84,8 @@ Tasks:
 - Describe visual content accurately
 - Extract relevant text from images
 - Identify patterns and relationships
-- Provide structured analysis"""
+- Provide structured analysis""",
     ),
-    
     Purpose.QUICK: LLMProfile(
         purpose=Purpose.QUICK,
         model=ModelSpec(
@@ -98,8 +95,8 @@ Tasks:
             max_tokens=4096,
             temperature=0,
         ),
-        prompt="You are AIDA's quick response specialist. Be brief but complete."
-    )
+        prompt="You are AIDA's quick response specialist. Be brief but complete.",
+    ),
 }
 
 

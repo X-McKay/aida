@@ -1,23 +1,23 @@
 """Thinking tool for complex reasoning and analysis."""
 
-from .thinking import ThinkingTool
+from .config import ThinkingConfig
 from .models import (
+    OutputFormat,
+    Perspective,
+    ReasoningType,
     ThinkingRequest,
     ThinkingResponse,
-    ReasoningType,
-    Perspective,
-    OutputFormat,
-    ThinkingSection
+    ThinkingSection,
 )
-from .config import ThinkingConfig
+from .thinking import ThinkingTool
 
 __all__ = [
     "ThinkingTool",
     "ThinkingRequest",
     "ThinkingResponse",
     "ReasoningType",
-    "Perspective", 
+    "Perspective",
     "OutputFormat",
     "ThinkingSection",
-    "ThinkingConfig"
+    "ThinkingConfig",
 ]

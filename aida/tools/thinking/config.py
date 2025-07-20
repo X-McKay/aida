@@ -1,25 +1,27 @@
 """Configuration for the thinking tool."""
 
-from typing import Dict, Any
+from typing import Any
+
 from aida.config.llm_profiles import Purpose
+
 from .models import ReasoningType
 
 
 class ThinkingConfig:
     """Configuration for thinking tool operations."""
-    
+
     # LLM Configuration
     LLM_PURPOSE = Purpose.DEFAULT
-    
+
     # Processing Configuration
     DEFAULT_DEPTH = 3
     MAX_RESPONSE_LENGTH = 4000
     SECTION_EXTRACTION_ENABLED = True
-    
+
     # Caching Configuration
     ENABLE_RESPONSE_CACHE = True
     CACHE_TTL_SECONDS = 3600  # 1 hour
-    
+
     # Prompt Templates
     REASONING_PROMPTS = {
         ReasoningType.SYSTEMATIC_ANALYSIS: """
@@ -99,58 +101,73 @@ Evaluate:
 3. Pros and cons of each option
 4. Risk assessment
 5. Recommended decision with rationale
-"""
+""",
     }
-    
+
     # Output Format Instructions
     OUTPUT_FORMAT_INSTRUCTIONS = {
         "structured": "\n\nProvide a well-structured response with clear sections.",
         "narrative": "\n\nProvide a flowing narrative response.",
         "bullet_points": "\n\nProvide response in clear bullet points.",
-        "detailed": "\n\nProvide a comprehensive, detailed response."
+        "detailed": "\n\nProvide a comprehensive, detailed response.",
     }
-    
+
     # Section Keywords for Extraction
     SECTION_KEYWORDS = [
-        "problem", "analysis", "factors", "constraints", "opportunities",
-        "risks", "recommendations", "conclusion", "summary", "next steps",
-        "insights", "approach", "solution", "strategy", "objectives",
-        "metrics", "dependencies", "components", "causes", "options"
+        "problem",
+        "analysis",
+        "factors",
+        "constraints",
+        "opportunities",
+        "risks",
+        "recommendations",
+        "conclusion",
+        "summary",
+        "next steps",
+        "insights",
+        "approach",
+        "solution",
+        "strategy",
+        "objectives",
+        "metrics",
+        "dependencies",
+        "components",
+        "causes",
+        "options",
     ]
-    
+
     # Validation Rules
     MIN_PROBLEM_LENGTH = 10
     MAX_PROBLEM_LENGTH = 5000
     MAX_CONTEXT_LENGTH = 10000
-    
+
     @classmethod
     def get_prompt_template(cls, reasoning_type: ReasoningType) -> str:
         """Get the prompt template for a reasoning type."""
         return cls.REASONING_PROMPTS.get(
-            reasoning_type, 
-            cls.REASONING_PROMPTS[ReasoningType.SYSTEMATIC_ANALYSIS]
+            reasoning_type, cls.REASONING_PROMPTS[ReasoningType.SYSTEMATIC_ANALYSIS]
         )
-    
+
     @classmethod
     def get_output_instruction(cls, format_type: str) -> str:
         """Get output format instruction."""
         return cls.OUTPUT_FORMAT_INSTRUCTIONS.get(format_type, "")
-    
+
     @classmethod
-    def get_mcp_config(cls) -> Dict[str, Any]:
+    def get_mcp_config(cls) -> dict[str, Any]:
         """Get MCP server configuration."""
         return {
             "server_name": "aida-thinking",
             "max_concurrent_requests": 10,
-            "timeout_seconds": 60
+            "timeout_seconds": 60,
         }
-    
+
     @classmethod
-    def get_observability_config(cls) -> Dict[str, Any]:
+    def get_observability_config(cls) -> dict[str, Any]:
         """Get OpenTelemetry configuration."""
         return {
             "service_name": "aida-thinking-tool",
             "trace_enabled": True,
             "metrics_enabled": True,
-            "export_endpoint": "http://localhost:4317"
+            "export_endpoint": "http://localhost:4317",
         }

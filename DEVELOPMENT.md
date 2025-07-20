@@ -4,7 +4,7 @@
 
 1. **Run smoke tests first**:
    ```bash
-   uv run python smoke_test.py
+   uv run python tests/scripts/smoke_test.py
    ```
    If these fail, the codebase is already broken. Fix it first.
 
@@ -12,7 +12,7 @@
    ```bash
    # For chat changes
    uv run aida chat
-   
+
    # For specific tool changes
    uv run python -m aida.cli.main test run --suite <suite_name>
    ```
@@ -29,7 +29,7 @@
 1. **Small Changes**: Make one change at a time
 2. **Test Immediately**: After each change, run:
    ```bash
-   uv run python smoke_test.py
+   uv run python tests/scripts/smoke_test.py
    ```
 3. **Test the Feature**: Test the specific feature you changed
 4. **Commit Often**: Small, working commits are better than large broken ones

@@ -7,13 +7,15 @@ repos:
         args: [--fix, --exit-non-zero-on-fix]
       - id: ruff-format
 
-  # MyPy for type checking
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.7.1
+  # Ty for type checking (Astral's new type checker)
+  - repo: local
     hooks:
-      - id: mypy
-        additional_dependencies: [types-all]
-        args: [--strict, --ignore-missing-imports]
+      - id: ty
+        name: ty type checker
+        entry: uvx ty check
+        language: system
+        types: [python]
+        pass_filenames: false
 
   # Security scanning
   - repo: https://github.com/PyCQA/bandit
@@ -24,10 +26,13 @@ repos:
         exclude: ^tests/
 
   # Safety check for known vulnerabilities
-  - repo: https://github.com/Lucas-C/pre-commit-hooks-safety
-    rev: v1.3.2
+  - repo: local
     hooks:
-      - id: python-safety-dependencies-check
+      - id: safety
+        name: safety check
+        entry: uv run safety check
+        language: system
+        pass_filenames: false
 
   # Standard pre-commit hooks
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -39,7 +44,7 @@ repos:
       - id: check-toml
       - id: check-json
       - id: check-added-large-files
-        args: ['--maxkb=1000']
+        args: ["--maxkb=1000"]
       - id: check-case-conflict
       - id: check-merge-conflict
       - id: debug-statements
@@ -51,7 +56,7 @@ repos:
     rev: v1.4.0
     hooks:
       - id: detect-secrets
-        args: ['--baseline', '.secrets.baseline']
+        args: ["--baseline", ".secrets.baseline"]
 
   # Documentation
   - repo: https://github.com/pycqa/pydocstyle
@@ -94,17 +99,17 @@ repos:
       - id: commitizen
         stages: [commit-msg]
 
-  # License header check
-  - repo: https://github.com/Lucas-C/pre-commit-hooks
-    rev: v1.5.4
-    hooks:
-      - id: insert-license
-        files: \.py$
-        args:
-          - --license-filepath
-          - LICENSE_HEADER
-          - --comment-style
-          - "#"
+  # License header check (disabled until LICENSE_HEADER file is created)
+  # - repo: https://github.com/Lucas-C/pre-commit-hooks
+  #   rev: v1.5.4
+  #   hooks:
+  #     - id: insert-license
+  #       files: \.py$
+  #       args:
+  #         - --license-filepath
+  #         - LICENSE_HEADER
+  #         - --comment-style
+  #         - "#"
 
 ci:
   autofix_commit_msg: |
@@ -112,8 +117,8 @@ ci:
 
     for more information, see https://pre-commit.ci
   autofix_prs: true
-  autoupdate_branch: ''
-  autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
+  autoupdate_branch: ""
+  autoupdate_commit_msg: "[pre-commit.ci] pre-commit autoupdate"
   autoupdate_schedule: weekly
   skip: []
   submodules: false

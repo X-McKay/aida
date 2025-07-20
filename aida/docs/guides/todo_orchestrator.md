@@ -183,7 +183,7 @@ To migrate from the legacy orchestrator:
    ```python
    # Old
    from aida.core.orchestrator import get_orchestrator
-   
+
    # New
    from aida.core.orchestrator import get_todo_orchestrator
    ```
@@ -192,7 +192,7 @@ To migrate from the legacy orchestrator:
    ```python
    # Old
    result = await orchestrator.execute_request(message)
-   
+
    # New
    plan = await orchestrator.create_plan(message)
    result = await orchestrator.execute_plan(plan)
@@ -202,7 +202,7 @@ To migrate from the legacy orchestrator:
    ```python
    # Old
    workflow.progress  # Float percentage
-   
+
    # New
    plan.get_progress()  # Dict with detailed stats
    ```

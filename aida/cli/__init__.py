@@ -1,12 +1,11 @@
 """CLI interface for AIDA."""
 
-from aida.cli.main import main, app
-from aida.cli.commands import *
-from aida.cli.ui import get_console, ProgressTracker, StatusDisplay
+from aida.cli.main import app, main
+from aida.cli.ui import ProgressTracker, StatusDisplay, get_console
 
 __all__ = [
     "main",
-    "app", 
+    "app",
     "get_console",
     "ProgressTracker",
     "StatusDisplay",

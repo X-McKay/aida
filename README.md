@@ -117,16 +117,16 @@ AIDA uses YAML/TOML configuration with schema validation:
 system:
   name: "aida"
   version: "1.0.0"
-  
+
 security:
   sandbox_enabled: true
   audit_logging: true
-  
+
 providers:
   llm:
     default: "ollama"
     fallback: ["openai", "anthropic"]
-    
+
 agents:
   max_concurrent: 10
   timeout: 300

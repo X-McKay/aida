@@ -34,7 +34,7 @@ $ARGUMENTS
    # Test plan creation
    plan = await orch.create_plan("What is 2+2?")
    print(f"Plan created: {plan.id}")
-   
+
    # Test execution
    result = await orch.execute_request("What is 2+2?")
    print(f"Result: {result['status']}")

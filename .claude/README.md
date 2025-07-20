@@ -32,7 +32,7 @@ Type `/` in Claude Code to see these commands:
    ```
    You: /run-tests hybrid_files
    Claude: [Runs specific test suite]
-   
+
    You: /add-tool WebSearchTool
    Claude: [Creates new tool with hybrid architecture]
    ```

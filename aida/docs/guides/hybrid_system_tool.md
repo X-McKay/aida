@@ -276,12 +276,12 @@ try:
         command="some-command",
         args=["--flag"]
     )
-    
+
     if result.status == ToolStatus.COMPLETED:
         print(f"Success: {result.result['stdout']}")
     else:
         print(f"Failed: {result.error}")
-        
+
 except Exception as e:
     print(f"Execution error: {e}")
 ```
@@ -352,7 +352,7 @@ plan = await orchestrator.create_plan(
     python -c "
     import asyncio
     from aida.tools.system import SystemTool
-    
+
     async def main():
         tool = SystemTool()
         result = await tool.execute(
@@ -360,7 +360,7 @@ plan = await orchestrator.create_plan(
             args=['test']
         )
         exit(result.result['exit_code'])
-    
+
     asyncio.run(main())
     "
 ```

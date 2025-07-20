@@ -75,28 +75,28 @@ with obs.trace_operation("bulk_process"):
 ```python
 class HybridTool(Tool):
     """Example hybrid tool implementation."""
-    
+
     def __init__(self):
         super().__init__(name="hybrid_tool", version="1.0.0")
         self._pydantic_tools_cache = {}
         self._mcp_server = None
         self._observability = None
-    
+
     async def execute(self, **kwargs) -> ToolResult:
         """Tool execution method."""
         # Implementation
         pass
-    
+
     def to_pydantic_tools(self) -> Dict[str, Callable]:
         """Convert to PydanticAI tools."""
         # Return dict of clean functions
         pass
-    
+
     def get_mcp_server(self) -> MCPServer:
         """Get MCP server interface."""
         # Return MCP wrapper
         pass
-    
+
     def enable_observability(self, config: Dict) -> Observability:
         """Enable OpenTelemetry."""
         # Return observability wrapper
@@ -109,7 +109,7 @@ class HybridTool(Tool):
 def to_pydantic_tools(self) -> Dict[str, Callable]:
     if self._pydantic_tools_cache:
         return self._pydantic_tools_cache
-    
+
     async def clean_function(param1: str, param2: int = None) -> Dict:
         """Clean function for PydanticAI."""
         result = await self.execute(
@@ -117,12 +117,12 @@ def to_pydantic_tools(self) -> Dict[str, Callable]:
             param1=param1,
             param2=param2
         )
-        
+
         if result.status == ToolStatus.COMPLETED:
             return result.result
         else:
             raise RuntimeError(result.error)
-    
+
     self._pydantic_tools_cache = {
         "clean_function": clean_function
     }
@@ -138,11 +138,11 @@ class ToolMCPServer:
         self.handlers = {
             "tool_operation": self._handle_operation
         }
-    
+
     async def call_tool(self, name: str, args: Dict) -> Dict:
         if name not in self.handlers:
             return {"isError": True, "content": [{"type": "text", "text": "Unknown tool"}]}
-        
+
         try:
             result = await self.handlers[name](args)
             return {
@@ -250,7 +250,7 @@ When implementing hybrid architecture:
 1. **Cache Tool Instances**
    ```python
    _tools_cache = {}
-   
+
    def get_tools():
        if "my_tool" not in _tools_cache:
            _tools_cache["my_tool"] = MyTool()
@@ -263,7 +263,7 @@ When implementing hybrid architecture:
    pydantic_tools = tool.to_pydantic_tools()
    for item in items:
        await pydantic_tools["process"](item)
-   
+
    # Bad: Create repeatedly
    for item in items:
        tools = tool.to_pydantic_tools()
@@ -309,14 +309,14 @@ Verify consistency across interfaces:
 async def test_consistency():
     # Same operation, different interfaces
     aida_result = await tool.execute(operation="get_data")
-    
+
     pydantic_tools = tool.to_pydantic_tools()
     pydantic_result = await pydantic_tools["get_data"]()
-    
+
     mcp = tool.get_mcp_server()
     mcp_result = await mcp.call_tool("tool_get_data", {})
     mcp_data = json.loads(mcp_result["content"][0]["text"])
-    
+
     # Verify same data returned
     assert aida_result.result["value"] == pydantic_result["value"]
     assert pydantic_result["value"] == mcp_data["value"]

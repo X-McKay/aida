@@ -11,9 +11,7 @@ The new simplified LLM system is available at:
 import warnings
 
 warnings.warn(
-    "aida.providers.llm is deprecated. Use aida.llm instead.",
-    DeprecationWarning,
-    stacklevel=2
+    "aida.providers.llm is deprecated. Use aida.llm instead.", DeprecationWarning, stacklevel=2
 )
 
 # Keep these for backward compatibility until migration is complete

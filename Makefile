@@ -112,7 +112,7 @@ quick-test: format lint
 	@echo "⚡ Running quick tests..."
 	python3 scripts/test_basic_functionality.py
 
-# Full development workflow  
+# Full development workflow
 full-check: format lint type-check security test
 	@echo "✅ Full development check complete!"
 

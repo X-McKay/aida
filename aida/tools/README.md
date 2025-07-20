@@ -72,14 +72,14 @@ Contains all configuration constants and settings:
 class ToolConfig:
     # LLM Configuration
     LLM_PURPOSE = Purpose.DEFAULT
-    
+
     # Processing Configuration
     DEFAULT_TIMEOUT = 30
     MAX_RETRIES = 3
-    
+
     # Feature flags
     ENABLE_CACHING = True
-    
+
     @classmethod
     def get_mcp_config(cls) -> Dict[str, Any]:
         """Get MCP server configuration."""
@@ -102,7 +102,7 @@ class ToolRequest(BaseModel):
     """Request model for tool operations."""
     operation: OperationType
     parameters: Dict[str, Any]
-    
+
     @validator('parameters')
     def validate_parameters(cls, v, values):
         # Custom validation logic
@@ -123,7 +123,7 @@ from aida.tools.base import Tool, ToolResult, ToolCapability, ToolParameter
 
 class ToolNameTool(Tool):
     """Main tool implementation."""
-    
+
     def __init__(self):
         super().__init__(
             name="tool_name",
@@ -133,20 +133,20 @@ class ToolNameTool(Tool):
         self._pydantic_tools_cache = {}
         self._mcp_server = None
         self._observability = None
-    
+
     def get_capability(self) -> ToolCapability:
         """Define tool capabilities."""
         return ToolCapability(...)
-    
+
     async def execute(self, **kwargs) -> ToolResult:
         """Execute tool operation."""
         # Implementation
-    
+
     # Hybrid architecture methods
     def to_pydantic_tools(self, agent=None) -> Dict[str, Callable]:
         """Convert to PydanticAI-compatible tools."""
         # Implementation
-    
+
     def get_mcp_server(self):
         """Get MCP server instance."""
         if self._mcp_server is None:
@@ -160,7 +160,7 @@ Handles prompt construction:
 ```python
 class PromptBuilder:
     """Builds prompts for LLM operations."""
-    
+
     def build(self, request: ToolRequest) -> str:
         """Build prompt from request."""
         # Implementation
@@ -171,7 +171,7 @@ Handles response parsing:
 ```python
 class ResponseParser:
     """Parses LLM responses into structured data."""
-    
+
     def parse(self, response: str, request: ToolRequest) -> ToolResponse:
         """Parse response into structured format."""
         # Implementation
@@ -182,11 +182,11 @@ MCP (Model Context Protocol) server implementation:
 ```python
 class ToolMCPServer:
     """MCP server wrapper for tool."""
-    
+
     async def list_tools(self) -> List[Dict[str, Any]]:
         """List available MCP tools."""
         # Implementation
-    
+
     async def call_tool(self, name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Handle MCP tool calls."""
         # Implementation
@@ -197,10 +197,10 @@ OpenTelemetry instrumentation:
 ```python
 class ToolObservability:
     """OpenTelemetry observability for tool."""
-    
+
     def __init__(self, tool, config: Dict[str, Any]):
         # Setup tracing and metrics
-    
+
     @contextmanager
     def trace_operation(self, operation: str, **attributes):
         """Create trace span for operation."""
@@ -329,33 +329,33 @@ from aida.tools.base_observability import SimpleObservability
 
 class MyTool(SimpleToolBase):
     """Example tool using base classes."""
-    
+
     def _get_tool_name(self) -> str:
         return "my_tool"
-    
+
     def _get_tool_version(self) -> str:
         return "1.0.0"
-    
+
     def _get_tool_description(self) -> str:
         return "Example tool demonstrating base classes"
-    
+
     def _get_default_config(self):
         return MyToolConfig()
-    
+
     def _create_processors(self) -> Dict[str, Callable]:
         return {
             "process": self._process_data,
             "analyze": self._analyze_data
         }
-    
+
     async def _process_data(self, data: str, **kwargs) -> Dict[str, Any]:
         # Implementation
         return {"processed": data.upper()}
-    
+
     async def _analyze_data(self, data: str, **kwargs) -> Dict[str, Any]:
         # Implementation
         return {"length": len(data), "words": len(data.split())}
-    
+
     def _create_mcp_server(self):
         return SimpleMCPServer(self, {
             "process": {
@@ -373,7 +373,7 @@ class MyTool(SimpleToolBase):
                 "required": ["data"]
             }
         })
-    
+
     def _create_observability(self, config: Dict[str, Any]):
         return SimpleObservability(self, config, {
             "data_processed": {
@@ -386,16 +386,16 @@ class MyTool(SimpleToolBase):
                 "unit": "bytes"
             }
         })
-    
+
     def _create_pydantic_tools(self) -> Dict[str, Callable]:
         async def process_data(data: str) -> str:
             result = await self.execute(operation="process", data=data)
             return result.result["processed"]
-        
+
         async def analyze_data(data: str) -> Dict[str, int]:
             result = await self.execute(operation="analyze", data=data)
             return result.result
-        
+
         return {
             "process_data": process_data,
             "analyze_data": analyze_data
@@ -455,7 +455,7 @@ tools/
 │   ├── models.py           # SearchRequest, SearchResult, etc.
 │   ├── web_search.py       # Main WebSearchTool class
 │   ├── search_engines.py   # Different search engine adapters
-│   ├── result_parser.py    # Parse and rank search results  
+│   ├── result_parser.py    # Parse and rank search results
 │   ├── mcp_server.py       # MCP protocol support
 │   └── observability.py    # Metrics and tracing
 ```

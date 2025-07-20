@@ -26,7 +26,7 @@ $ARGUMENTS
    ```bash
    uv run python -m aida.cli.main test run --suite $ARGUMENTS
    ```
-   
+
    Or with verbose output:
    ```bash
    uv run python -m aida.cli.main test run --suite $ARGUMENTS --verbose
