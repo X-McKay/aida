@@ -55,7 +55,7 @@ jobs:
         uv run safety check
     
     - name: Upload security reports
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: security-reports-${{ matrix.python-version }}
         path: |
@@ -173,7 +173,7 @@ jobs:
         uv run pytest tests/benchmarks/ --benchmark-json=benchmark-results.json
     
     - name: Upload benchmark results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: benchmark-results
         path: benchmark-results.json
