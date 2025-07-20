@@ -1,0 +1,148 @@
+version: '3.8'
+
+services:
+  aida:
+    build:
+      context: .
+      target: development
+    container_name: aida-dev
+    volumes:
+      - .:/app
+      - /var/run/docker.sock:/var/run/docker.sock
+      - aida-data:/app/data
+      - aida-logs:/app/logs
+    ports:
+      - "8000:8000"
+      - "8001:8001"  # Debug port
+    environment:
+      - AIDA_ENV=development
+      - AIDA_LOG_LEVEL=DEBUG
+      - AIDA_CONFIG_PATH=/app/config/development.yaml
+    networks:
+      - aida-network
+    depends_on:
+      - redis
+      - postgres
+    restart: unless-stopped
+
+  aida-worker:
+    build:
+      context: .
+      target: development
+    container_name: aida-worker
+    volumes:
+      - .:/app
+      - /var/run/docker.sock:/var/run/docker.sock
+      - aida-data:/app/data
+      - aida-logs:/app/logs
+    environment:
+      - AIDA_ENV=development
+      - AIDA_LOG_LEVEL=DEBUG
+      - AIDA_CONFIG_PATH=/app/config/development.yaml
+      - AIDA_MODE=worker
+    networks:
+      - aida-network
+    depends_on:
+      - redis
+      - postgres
+    restart: unless-stopped
+    command: ["aida", "worker", "--concurrency", "4"]
+
+  redis:
+    image: redis:7-alpine
+    container_name: aida-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - aida-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: aida-postgres
+    environment:
+      POSTGRES_DB: aida
+      POSTGRES_USER: aida
+      POSTGRES_PASSWORD: aida_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    networks:
+      - aida-network
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: aida-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    networks:
+      - aida-network
+    restart: unless-stopped
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: aida-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    networks:
+      - aida-network
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: aida-grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+    networks:
+      - aida-network
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: aida-jaeger
+    ports:
+      - "16686:16686"
+      - "14250:14250"
+    networks:
+      - aida-network
+    restart: unless-stopped
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+
+volumes:
+  aida-data:
+  aida-logs:
+  redis-data:
+  postgres-data:
+  ollama-data:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  aida-network:
+    driver: bridge
