@@ -27,6 +27,7 @@ from aida.cli.commands.llm import llm_app
 from aida.cli.commands.system import system_app
 from aida.cli.commands.interactive import interactive_app
 from aida.cli.commands.tools import tools_app
+from aida.cli.commands.test import test_app
 from aida.cli.ui import setup_console
 
 
@@ -45,6 +46,7 @@ app.add_typer(llm_app, name="llm", help="LLM provider management")
 app.add_typer(system_app, name="system", help="System administration")
 app.add_typer(interactive_app, name="interactive", help="Interactive mode")
 app.add_typer(tools_app, name="tools", help="Tool management and execution")
+app.add_typer(test_app, name="test", help="Integration testing for refactored components")
 
 # Setup console
 console = setup_console()

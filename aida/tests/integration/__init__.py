@@ -1,0 +1,1 @@
+"""AIDA integration tests for refactored components."""

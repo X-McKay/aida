@@ -1,24 +1,20 @@
-"""LLM provider integrations."""
+"""LLM provider integrations.
 
-from aida.providers.llm.base import LLMProvider, LLMMessage, LLMResponse, LLMError, LLMConfig
-from aida.providers.llm.manager import LLMManager, LLMRouter
-from aida.providers.llm.openai import OpenAIProvider
-from aida.providers.llm.anthropic import AnthropicProvider
-from aida.providers.llm.cohere import CohereProvider
-from aida.providers.llm.ollama import OllamaProvider
-from aida.providers.llm.vllm import VLLMProvider
+DEPRECATED: This module is deprecated. Use aida.llm instead.
 
-__all__ = [
-    "LLMProvider",
-    "LLMMessage",
-    "LLMResponse",
-    "LLMError", 
-    "LLMConfig",
-    "LLMManager",
-    "LLMRouter",
-    "OpenAIProvider",
-    "AnthropicProvider",
-    "CohereProvider",
-    "OllamaProvider",
-    "VLLMProvider",
-]
+The new simplified LLM system is available at:
+- aida.llm.chat() - Simple chat interface
+- aida.config.llm_profiles - Purpose-based configuration
+- aida.config.models - Model specifications
+"""
+
+import warnings
+
+warnings.warn(
+    "aida.providers.llm is deprecated. Use aida.llm instead.",
+    DeprecationWarning,
+    stacklevel=2
+)
+
+# Keep these for backward compatibility until migration is complete
+__all__ = []

@@ -13,7 +13,7 @@ from rich.syntax import Syntax
 
 from aida.cli.ui.console import get_console
 from aida.core.agent import Agent, AgentConfig, AgentCapability
-from aida.providers.llm.manager import get_llm_manager
+from aida.llm import get_llm
 from aida.tools.base import get_tool_registry, initialize_default_tools
 
 
@@ -26,7 +26,7 @@ class InteractiveSession:
     
     def __init__(self):
         self.agent: Optional[Agent] = None
-        self.llm_manager = get_llm_manager()
+        self.llm_manager = get_llm()
         self.tool_registry = get_tool_registry()
         self.conversation_history: List[Dict[str, Any]] = []
         self.session_started = datetime.utcnow()
