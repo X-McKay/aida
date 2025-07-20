@@ -16,11 +16,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Streaming support for LLM responses with proper async iteration
 - Automatic provider selection and configuration
 - Mock tool system for testing orchestrator execution
+- **HYBRID ARCHITECTURE**: FileOperationsTool with multi-framework support
+- PydanticAI compatibility layer for modern AI agent frameworks
+- Model Context Protocol (MCP) server integration for universal AI compatibility
+- OpenTelemetry observability support for production monitoring
 
 ### Changed
 - **BREAKING**: Replaced complex LLM provider system with simplified PydanticAI-based approach
 - **BREAKING**: Removed fallback mechanism and hardcoded model lists for simplified configuration
 - **BREAKING**: Refactored Todo Orchestrator into modular structure with separate files for models, storage, config, and orchestrator logic
+- **ENHANCED**: FileOperationsTool upgraded to hybrid architecture supporting multiple AI frameworks
 - Migrated Todo Orchestrator to use new LLM system
 - Updated all LLM imports to use `aida.llm` module
 - Improved error handling in Todo Orchestrator with proper defaults for missing fields
@@ -70,6 +75,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `__init__.py` - Public API and backward compatibility
 - Updated unit tests to properly mock new modular structure
 - Removed compatibility layer after updating all references
+- **Hybrid FileOperationsTool Architecture**: Single tool supporting multiple interfaces:
+  - Original AIDA interface (backward compatible)
+  - PydanticAI tool functions (`to_pydantic_tools()`, `register_with_pydantic_agent()`)
+  - MCP server interface (`get_mcp_server()`) for Claude and universal AI agents
+  - OpenTelemetry observability (`enable_observability()`) for production monitoring
+- Comprehensive examples demonstrating real-world hybrid usage patterns
+- Zero breaking changes - existing AIDA code continues to work unchanged
 
 ## [Previous Versions]
 
