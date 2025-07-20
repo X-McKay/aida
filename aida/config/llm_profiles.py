@@ -29,7 +29,9 @@ DEFAULT_PROFILES = {
         model=ModelSpec(
             provider=Provider.OLLAMA,
             model_id="llama3.2:latest",
-            base_url="http://localhost:11434"
+            base_url="http://localhost:11434",
+            max_tokens=16384,
+            temperature=0,
         ),
         prompt="You are AIDA, a helpful AI assistant. Provide clear, accurate responses."
     ),
@@ -56,7 +58,9 @@ Guidelines:
         model=ModelSpec(
             provider=Provider.OLLAMA,
             model_id="deepseek-r1:8b",
-            base_url="http://localhost:11434"
+            base_url="http://localhost:11434",
+            max_tokens=16384,
+            temperature=0,
         ),
         prompt="""You are AIDA's reasoning specialist for complex analysis.
 
@@ -71,8 +75,10 @@ Approach:
     Purpose.MULTIMODAL: LLMProfile(
         purpose=Purpose.MULTIMODAL,
         model=ModelSpec(
-            provider=Provider.OPENAI,
-            model_id="gpt-4o"
+            provider=Provider.OLLAMA,
+            model_id="llama3.2:latest",
+            base_url="http://localhost:11434",
+            temperature=0,
         ),
         prompt="""You are AIDA's multimodal specialist. Analyze images and multimedia content.
 
@@ -88,8 +94,9 @@ Tasks:
         model=ModelSpec(
             provider=Provider.OLLAMA,
             model_id="tinyllama:latest",
-            max_tokens=1000,
-            base_url="http://localhost:11434"
+            base_url="http://localhost:11434",
+            max_tokens=4096,
+            temperature=0,
         ),
         prompt="You are AIDA's quick response specialist. Be brief but complete."
     )

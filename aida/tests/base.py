@@ -20,9 +20,10 @@ class TestResult:
 class BaseTestSuite:
     """Base class for test suites."""
     
-    def __init__(self, name: str, verbose: bool = False):
+    def __init__(self, name: str, verbose: bool = False, persist_files: bool = False):
         self.name = name
         self.verbose = verbose
+        self.persist_files = persist_files
         self.results: List[TestResult] = []
     
     def log(self, message: str):
@@ -111,19 +112,19 @@ class TestRegistry:
         """Register a test suite."""
         self._suites[name] = suite_class
     
-    def get_suite(self, name: str, verbose: bool = False) -> Optional[BaseTestSuite]:
+    def get_suite(self, name: str, verbose: bool = False, persist_files: bool = False) -> Optional[BaseTestSuite]:
         """Get a test suite instance."""
         if name in self._suites:
-            return self._suites[name](verbose=verbose)
+            return self._suites[name](verbose=verbose, persist_files=persist_files)
         return None
     
     def list_suites(self) -> List[str]:
         """List available test suites."""
         return list(self._suites.keys())
     
-    async def run_suite(self, name: str, verbose: bool = False) -> List[TestResult]:
+    async def run_suite(self, name: str, verbose: bool = False, persist_files: bool = False) -> List[TestResult]:
         """Run a specific test suite."""
-        suite = self.get_suite(name, verbose)
+        suite = self.get_suite(name, verbose, persist_files=persist_files)
         if not suite:
             raise ValueError(f"Unknown test suite: {name}")
         
@@ -134,12 +135,12 @@ class TestRegistry:
         suite.print_results()
         return results
     
-    async def run_all_suites(self, verbose: bool = False) -> Dict[str, List[TestResult]]:
+    async def run_all_suites(self, verbose: bool = False, persist_files: bool = False) -> Dict[str, List[TestResult]]:
         """Run all registered test suites."""
         all_results = {}
         
         for suite_name in self._suites.keys():
-            results = await self.run_suite(suite_name, verbose)
+            results = await self.run_suite(suite_name, verbose, persist_files=persist_files)
             all_results[suite_name] = results
         
         return all_results

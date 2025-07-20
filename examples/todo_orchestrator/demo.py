@@ -30,7 +30,7 @@ import typer
 # Add AIDA to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from aida.core.todo_orchestrator import TodoOrchestrator, TodoPlan, TodoStep, TodoStatus, ReplanReason
+from aida.core.orchestrator import TodoOrchestrator, TodoPlan, TodoStep, TodoStatus, ReplanReason
 from aida.tools.base import ToolResult, ToolCapability, ToolParameter, ToolStatus
 # Using new simplified LLM system - no manual LLM setup needed!
 from datetime import datetime, timezone

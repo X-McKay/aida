@@ -386,13 +386,14 @@ class SystemTool(Tool):
         
         # Check file system access
         try:
-            temp_dir = tempfile.gettempdir()
-            temp_file = os.path.join(temp_dir, "aida_health_check.tmp")
+            temp_dir = Path(".aida/tmp")
+            temp_dir.mkdir(parents=True, exist_ok=True)
+            temp_file = temp_dir / "aida_health_check.tmp"
             
             with open(temp_file, "w") as f:
                 f.write("health check")
             
-            os.unlink(temp_file)
+            temp_file.unlink()
             
             checks["filesystem_access"] = {"available": True}
         except Exception as e:

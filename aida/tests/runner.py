@@ -13,8 +13,9 @@ from aida.tests.integration.test_orchestrator import OrchestratorTestSuite
 class AIDATestRunner:
     """Main test runner for AIDA integration tests."""
     
-    def __init__(self, verbose: bool = False):
+    def __init__(self, verbose: bool = False, persist_files: bool = False):
         self.verbose = verbose
+        self.persist_files = persist_files
         self.all_results: Dict[str, List[TestResult]] = {}
     
     async def run_specific_suite(self, suite_name: str) -> List[TestResult]:
@@ -23,7 +24,7 @@ class AIDATestRunner:
             available = ", ".join(test_registry.list_suites())
             raise ValueError(f"Unknown test suite '{suite_name}'. Available: {available}")
         
-        results = await test_registry.run_suite(suite_name, self.verbose)
+        results = await test_registry.run_suite(suite_name, self.verbose, persist_files=self.persist_files)
         self.all_results[suite_name] = results
         return results
     
@@ -34,7 +35,7 @@ class AIDATestRunner:
         print("Testing refactored components with real functionality")
         print("")
         
-        results = await test_registry.run_all_suites(self.verbose)
+        results = await test_registry.run_all_suites(self.verbose, persist_files=self.persist_files)
         self.all_results = results
         return results
     
@@ -103,7 +104,8 @@ class AIDATestRunner:
 
 async def run_tests(
     suite_name: Optional[str] = None,
-    verbose: bool = False
+    verbose: bool = False,
+    persist_files: bool = False
 ) -> bool:
     """
     Run AIDA integration tests.
@@ -111,11 +113,12 @@ async def run_tests(
     Args:
         suite_name: Specific test suite to run (None for all)
         verbose: Enable verbose output
+        persist_files: Keep generated test files instead of cleaning them up
     
     Returns:
         True if all tests passed, False otherwise
     """
-    runner = AIDATestRunner(verbose=verbose)
+    runner = AIDATestRunner(verbose=verbose, persist_files=persist_files)
     
     try:
         if suite_name:

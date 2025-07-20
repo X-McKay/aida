@@ -139,7 +139,7 @@ Live updating console display with:
 ### Basic Workflow
 
 ```python
-from aida.core.todo_orchestrator import get_todo_orchestrator
+from aida.core.orchestrator import get_todo_orchestrator
 
 # Get orchestrator
 orchestrator = get_todo_orchestrator()
@@ -203,7 +203,7 @@ assert len(plan.steps) > 0
 - Python 3.8+
 - typer
 - rich (for console output)
-- aida.core.todo_orchestrator (imports path adjusted automatically)
+- aida.core.orchestrator (imports path adjusted automatically)
 
 ## Integration Notes
 
@@ -264,7 +264,7 @@ Enable debug logging to see detailed execution information:
 
 ```python
 import logging
-logging.getLogger('aida.core.todo_orchestrator').setLevel(logging.DEBUG)
+logging.getLogger('aida.core.orchestrator').setLevel(logging.DEBUG)
 ```
 
 ## Future Enhancements

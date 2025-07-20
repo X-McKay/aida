@@ -22,7 +22,7 @@ import typer
 # Add AIDA to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from aida.core.todo_orchestrator import TodoOrchestrator, TodoPlan, TodoStep, TodoStatus, ReplanReason
+from aida.core.orchestrator import TodoOrchestrator, TodoPlan, TodoStep, TodoStatus, ReplanReason
 from aida.tools.base import ToolResult, ToolCapability, ToolParameter, ToolStatus
 from datetime import datetime, timezone
 
@@ -326,6 +326,11 @@ class StandaloneOrchestrator(TodoOrchestrator):
         self.active_plans = {}
         self._tools_initialized = True
         self._step_counter = 0
+        
+        # Create a mock storage manager that doesn't actually save files
+        from unittest.mock import Mock
+        self.storage_manager = Mock()
+        self.storage_manager.save_plan = Mock(return_value="mock_path")
 
 
 async def run_example(request: str, show_progress: bool = True):

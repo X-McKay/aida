@@ -11,7 +11,7 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.table import Table
 
-from aida.core.todo_orchestrator import get_todo_orchestrator, TodoPlan, TodoStep, ReplanReason
+from aida.core.orchestrator import get_todo_orchestrator, TodoPlan, TodoStep, ReplanReason
 
 
 console = Console()

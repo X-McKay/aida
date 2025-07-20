@@ -20,10 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **BREAKING**: Replaced complex LLM provider system with simplified PydanticAI-based approach
 - **BREAKING**: Removed fallback mechanism and hardcoded model lists for simplified configuration
+- **BREAKING**: Refactored Todo Orchestrator into modular structure with separate files for models, storage, config, and orchestrator logic
 - Migrated Todo Orchestrator to use new LLM system
 - Updated all LLM imports to use `aida.llm` module
 - Improved error handling in Todo Orchestrator with proper defaults for missing fields
 - Enhanced test coverage with real functionality testing (no mocks for core features)
+- Updated unit tests to work with new modular orchestrator structure
 
 ### Fixed
 - EOF error when piping input to todo orchestrator standalone example
@@ -37,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - FallbackModel and complex fallback chain mechanisms
 - Hardcoded model availability checks
 - Mocked LLM responses in core functionality tests
+- Monolithic `todo_orchestrator.py` file (replaced with modular structure)
 
 ### Technical Details
 
@@ -59,6 +62,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added robust error handling for malformed LLM responses
 - Improved plan creation with proper field defaults
 - Enhanced progress tracking and execution reliability
+- **Modular Architecture**: Split monolithic file into separate modules:
+  - `orchestrator.py` - Core orchestration logic
+  - `models.py` - Data models (TodoPlan, TodoStep, TodoStatus, etc.)
+  - `storage.py` - Plan persistence and storage management
+  - `config.py` - Configuration and constants
+  - `__init__.py` - Public API and backward compatibility
+- Updated unit tests to properly mock new modular structure
+- Removed compatibility layer after updating all references
 
 ## [Previous Versions]
 

@@ -51,7 +51,7 @@ class TodoPlan:
 ### Basic Usage
 
 ```python
-from aida.core.todo_orchestrator import get_todo_orchestrator
+from aida.core.orchestrator import get_todo_orchestrator
 
 # Get orchestrator instance
 orchestrator = get_todo_orchestrator()
@@ -185,7 +185,7 @@ To migrate from the legacy orchestrator:
    from aida.core.orchestrator import get_orchestrator
    
    # New
-   from aida.core.todo_orchestrator import get_todo_orchestrator
+   from aida.core.orchestrator import get_todo_orchestrator
    ```
 
 2. **Update Method Calls**:

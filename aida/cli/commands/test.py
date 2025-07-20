@@ -48,6 +48,11 @@ def run(
         False,
         "--verbose", "-v", 
         help="Enable verbose output"
+    ),
+    persist_files: bool = typer.Option(
+        False,
+        "--persist-files", "-p",
+        help="Keep generated test files instead of cleaning them up"
     )
 ):
     """Run integration tests for refactored components."""
@@ -69,7 +74,7 @@ def run(
     
     # Run the tests
     try:
-        success = asyncio.run(run_tests(suite, verbose))
+        success = asyncio.run(run_tests(suite, verbose, persist_files=persist_files))
         
         if success:
             console.print("\n[green]🎉 All tests passed![/green]")
