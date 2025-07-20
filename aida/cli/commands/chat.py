@@ -44,7 +44,7 @@ class ChatSession:
     
     def __init__(self):
         self.agent: Optional[Agent] = None
-        self.llm_manager = get_llm()
+        # LLM will be accessed through orchestrator
         self.tool_registry = get_tool_registry()
         self.conversation_history: List[Dict[str, Any]] = []
         self.session_started = datetime.utcnow()
@@ -103,13 +103,18 @@ class ChatSession:
     
     async def _setup_agent(self):
         """Setup chat agent with enhanced capabilities."""
-        # Auto-configure LLM providers
+        # Verify LLM is available
         try:
-            from aida.config.llm_defaults import auto_configure_llm_providers
-            await auto_configure_llm_providers()
-            console.print("[dim]✅ LLM providers configured[/dim]")
+            from aida.llm import get_llm
+            manager = get_llm()
+            purposes = manager.list_purposes()
+            if purposes:
+                console.print(f"[dim]✅ LLM configured with {len(purposes)} purposes (using Ollama)[/dim]")
+            else:
+                console.print("[warning]⚠️  No LLM purposes available[/warning]")
         except Exception as e:
-            console.print(f"[warning]⚠️  LLM setup warning: {e}[/warning]")
+            console.print(f"[warning]⚠️  LLM check failed: {e}[/warning]")
+            console.print("[dim]Make sure Ollama is running: ollama serve[/dim]")
         
         # Initialize tools
         try:
@@ -527,8 +532,13 @@ class ChatSession:
         table.add_row("Tools", "Loaded", f"{tools_count} tools available")
         
         # LLM
-        providers = self.llm_manager.list_providers()
-        table.add_row("LLM Providers", "Ready", f"{len(providers)} configured")
+        try:
+            from aida.llm import get_llm
+            manager = get_llm()
+            purposes = manager.list_purposes()
+            table.add_row("LLM", "Ready", f"{len(purposes)} purposes (Ollama)")
+        except:
+            table.add_row("LLM", "Not Ready", "Ollama not running")
         
         # Context
         table.add_row(
