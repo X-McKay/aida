@@ -109,7 +109,7 @@ class TodoOrchestrator:
             step = TodoStep(
                 id=step_id,
                 description=step_data.get("description", f"Step {i+1}"),
-                tool_name=step_data.get("tool", OrchestratorConfig.DEFAULT_TOOL_NAME),
+                tool_name=step_data.get("tool_name") or step_data.get("tool", OrchestratorConfig.DEFAULT_TOOL_NAME),
                 parameters=step_data.get("parameters", {}),
                 dependencies=step_data.get("dependencies", []),
                 max_retries=OrchestratorConfig.DEFAULT_MAX_RETRIES
@@ -256,16 +256,22 @@ class TodoOrchestrator:
             result = await tool.execute_async(**step.parameters)
             step.result = result
             step.completed_at = datetime.utcnow()
-            step.status = TodoStatus.COMPLETED
+            
+            # Check if tool execution was successful
+            if result and hasattr(result, 'status') and str(result.status).lower() in ['failed', 'error']:
+                step.status = TodoStatus.FAILED
+                step.error = result.error if hasattr(result, 'error') else "Tool execution failed"
+                logger.error(f"Failed: {step.description} - {step.error}")
+            else:
+                step.status = TodoStatus.COMPLETED
+                logger.info(f"Completed: {step.description}")
             
             # Save plan after step completion
             self.storage_manager.save_plan(plan)
             
-            logger.info(f"Completed: {step.description}")
-            
             return {
                 "step_id": step.id,
-                "success": True,
+                "success": step.status == TodoStatus.COMPLETED,
                 "result": result.model_dump() if result and hasattr(result, 'model_dump') else (result.dict() if result and hasattr(result, 'dict') else result)
             }
             
@@ -326,15 +332,24 @@ class TodoOrchestrator:
     def _create_todo_planning_prompt(self, user_request: str, tool_specs: Dict, context: Dict[str, Any]) -> str:
         """Create a planning prompt focused on TODO-style output."""
         
-        tools_info = "\n".join([
-            f"- {name}: {spec['description']}" 
-            for name, spec in tool_specs.items()
-        ])
+        tools_info = []
+        for name, spec in tool_specs.items():
+            params = []
+            for param in spec.get('parameters', []):
+                param_desc = f"{param['name']} ({param['type']})"
+                if param.get('required'):
+                    param_desc += " [REQUIRED]"
+                params.append(f"    - {param_desc}: {param['description']}")
+            
+            tool_desc = f"- {name}: {spec['description']}"
+            if params:
+                tool_desc += "\n  Parameters:\n" + "\n".join(params)
+            tools_info.append(tool_desc)
         
         template = OrchestratorConfig.get_planning_prompt_template()
         return template.format(
             user_request=user_request,
-            tools_info=tools_info,
+            tools_info="\n".join(tools_info),
             context=json.dumps(context, indent=2) if context else "None"
         )
     
@@ -470,7 +485,9 @@ class TodoOrchestrator:
     async def _ensure_tools_initialized(self):
         """Ensure tools are properly initialized."""
         if not self._tools_initialized:
-            # Tools should be initialized via the registry
+            # Initialize default tools
+            from aida.tools.base import initialize_default_tools
+            await initialize_default_tools()
             self._tools_initialized = True
     
     async def execute_request(
@@ -488,12 +505,25 @@ class TodoOrchestrator:
             async def wrapped_progress(plan, step):
                 if progress_callback:
                     # Convert to workflow format for compatibility
-                    workflow = {
-                        "steps": [{"tool_name": s.tool, "parameters": s.parameters, "purpose": s.description} 
-                                 for s in plan.steps],
-                        "current_step": plan.steps.index(step) if step in plan.steps else 0
-                    }
-                    await progress_callback(workflow, step)
+                    # Create a simple object with the attributes expected by chat
+                    class WorkflowAdapter:
+                        def __init__(self, plan, current_step_obj):
+                            self.steps = [{"tool_name": s.tool_name, "parameters": s.parameters, "purpose": s.description} 
+                                         for s in plan.steps]
+                            self.current_step = plan.steps.index(current_step_obj) if current_step_obj in plan.steps else 0
+                    
+                    workflow = WorkflowAdapter(plan, step)
+                    
+                    # Create step adapter with expected attributes
+                    class StepAdapter:
+                        def __init__(self, step_obj):
+                            self.tool_name = step_obj.tool_name
+                            self.parameters = step_obj.parameters
+                            self.purpose = step_obj.description
+                            self.status = "running" if step_obj.status.value == "in_progress" else step_obj.status.value
+                    
+                    step_adapter = StepAdapter(step)
+                    await progress_callback(workflow, step_adapter)
             
             # Execute the plan
             result = await self.execute_plan(
@@ -513,12 +543,12 @@ class TodoOrchestrator:
                     "results": [
                         {
                             "step": {
-                                "tool_name": step.tool,
+                                "tool_name": step.tool_name,
                                 "parameters": step.parameters,
                                 "purpose": step.description
                             },
                             "success": step.status == TodoStatus.COMPLETED,
-                            "result": step.result
+                            "result": step.result.model_dump() if step.result and hasattr(step.result, 'model_dump') else step.result
                         }
                         for step in plan.steps
                     ],

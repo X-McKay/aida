@@ -36,7 +36,7 @@ class OrchestratorConfig:
     def get_planning_prompt_template(cls) -> str:
         """Get the planning prompt template."""
         return """
-You are a workflow planning assistant. Create a TODO-style execution plan for the user's request.
+You are a workflow planning assistant. Analyze the user's request and determine the best approach.
 
 USER REQUEST: {user_request}
 
@@ -45,28 +45,58 @@ AVAILABLE TOOLS:
 
 CONTEXT: {context}
 
-IMPORTANT: Respond ONLY with valid JSON. Do not include any explanatory text before or after the JSON.
+IMPORTANT: First determine if this request needs tools or can be answered directly:
+- General knowledge questions -> Use "llm_response" tool to provide an answer
+- Questions about information -> Use "llm_response" tool
+- Questions like "What are good places to...", "How do I...", "Explain..." -> Use "llm_response" tool
+- File operations -> Use "file_operations" tool ONLY when user explicitly asks about files
+- Code execution -> Use "execution" tool ONLY when user wants to run code
+- System commands -> Use "system" tool ONLY when user wants system info
 
-Respond with exactly this JSON structure:
+CRITICAL: When the user's question refers to previous conversation (uses words like "those", "it", "them", "the above", etc.):
+1. Look at the CONTEXT for conversation_history
+2. Extract relevant previous messages
+3. Pass them as the "context" parameter to llm_response tool
+
+Respond ONLY with valid JSON:
 
 {{
     "analysis": "Brief analysis of what needs to be done",
     "expected_outcome": "What the user should expect as a result",
     "execution_plan": [
         {{
-            "description": "Clear description of what this step does (for TODO list)",
-            "tool": "thinking",
-            "parameters": {{"problem": "description of what to think about"}},
+            "description": "Clear description of what this step does",
+            "tool_name": "tool_name_here",
+            "parameters": {{"param1": "value1", "param2": "value2"}},
             "dependencies": []
         }}
     ]
 }}
 
-Requirements:
-- Keep analysis and expected_outcome to 1-2 sentences each
-- Use "thinking" as the tool for most steps since specific tools may not be available
+Guidelines:
+- For general questions -> Create ONE step using llm_response tool
+- IMPORTANT: If the CONTEXT includes conversation_history, you MUST pass it to llm_response as context
+- Only use file_operations when the user explicitly asks about files
+- Only use execution when the user wants to run code
 - Create 1-3 steps maximum to keep plans simple
 - Respond with ONLY the JSON object, no other text
+
+Example for a general question with context:
+{{
+    "analysis": "User wants information about which snowboarding location is best in March, referring to previously mentioned locations",
+    "expected_outcome": "Information about the best snowboarding location in March from the previously listed options",
+    "execution_plan": [
+        {{
+            "description": "Provide information about the best snowboarding location in March",
+            "tool_name": "llm_response",
+            "parameters": {{
+                "question": "Which of those is typically the best or most popular in March?",
+                "context": "Previous conversation discussed these East Coast snowboarding locations: Stowe Vermont, Killington Vermont, Hunter Mountain New York, Sunday River Maine, and Bretton Woods New Hampshire"
+            }},
+            "dependencies": []
+        }}
+    ]
+}}
 """
     
     @classmethod

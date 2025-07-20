@@ -7,6 +7,7 @@ from typing import Optional, List, Dict, Any, Callable
 from datetime import datetime
 from pathlib import Path
 import json
+import logging
 
 import typer
 from rich.panel import Panel
@@ -26,6 +27,7 @@ from aida.tools.base import get_tool_registry, initialize_default_tools
 
 chat_app = typer.Typer(name="chat")
 console = get_console()
+logger = logging.getLogger(__name__)
 
 # Command shortcuts mapping
 COMMAND_SHORTCUTS = {
@@ -415,7 +417,8 @@ class ChatSession:
                 # Has code blocks - render as markdown
                 console.print(Markdown(response))
             else:
-                console.print(response)
+                # Plain text response
+                console.print(f"\n{response}")
                 
             # Show execution summary for complex workflows
             summary = result.get("execution_summary", {})
@@ -434,9 +437,16 @@ class ChatSession:
         
         # Extract key results
         for result in step_results:
+            tool_name = result["step"]["tool_name"]
+            
             if result.get("success") and result.get("result"):
-                tool_name = result["step"]["tool_name"]
-                result_data = result["result"].get("result", {})
+                result_obj = result["result"]
+                result_data = result_obj.get("result", {})
+                
+                # Check if the tool execution actually failed
+                if result_obj.get("status") == "failed" and result_obj.get("error"):
+                    response_parts.append(f"❌ {tool_name} failed: {result_obj['error']}")
+                    continue
                 
                 if tool_name == "thinking" and isinstance(result_data, dict):
                     if "recommendations" in result_data:
@@ -448,16 +458,66 @@ class ChatSession:
                     elif "final_insight" in result_data:
                         response_parts.append(result_data["final_insight"])
                         
-                elif tool_name == "file_operations":
+                elif tool_name == "file_operations" and isinstance(result_data, dict):
                     step_params = result["step"].get("parameters", {})
-                    if step_params.get("operation") == "write_file":
+                    operation = step_params.get("operation", "")
+                    
+                    if operation == "write_file":
                         content = step_params.get("content", "")
                         path = result_data.get("path", step_params.get("path", ""))
                         response_parts.append(f"Created {path}:\n```\n{content}\n```")
+                    elif operation == "list_files" and "files" in result_data:
+                        files = result_data["files"]
+                        if isinstance(files, list):
+                            response_parts.append(f"Found {len(files)} files:\n" + "\n".join(f"- {f}" for f in files[:20]))
+                            if len(files) > 20:
+                                response_parts.append(f"... and {len(files) - 20} more")
+                    elif operation == "read_file" and "content" in result_data:
+                        response_parts.append(f"File content:\n```\n{result_data['content'][:500]}\n```")
+                        if len(result_data['content']) > 500:
+                            response_parts.append("... (truncated)")
+                    elif "path" in result_data:
+                        response_parts.append(f"Operation completed on: {result_data['path']}")
                         
                 elif tool_name == "execution":
+                    if isinstance(result_data, dict) and "stdout" in result_data and result_data["stdout"]:
+                        output = result_data['stdout'].strip()
+                        response_parts.append(f"Output:\n```\n{output}\n```")
+                    else:
+                        # Debug: show what we got
+                        logger.debug(f"Execution result_data: {result_data}")
+                        
+                elif tool_name == "system" and isinstance(result_data, dict):
                     if "stdout" in result_data and result_data["stdout"]:
-                        response_parts.append(f"Output:\n```\n{result_data['stdout'].strip()}\n```")
+                        response_parts.append(f"System output:\n```\n{result_data['stdout'].strip()}\n```")
+                    elif "output" in result_data:
+                        response_parts.append(f"System output:\n```\n{result_data['output'].strip()}\n```")
+                    if "stderr" in result_data and result_data["stderr"]:
+                        response_parts.append(f"Error output:\n```\n{result_data['stderr'].strip()}\n```")
+                        
+                elif tool_name == "llm_response":
+                    # For llm_response tool, the result is the direct string response
+                    if isinstance(result_data, str):
+                        response_parts.append(result_data)
+                    else:
+                        # If it's wrapped in a dict or something else, extract the content
+                        logger.debug(f"llm_response result_data type: {type(result_data)}, value: {result_data}")
+                        response_parts.append(str(result_data))
+                        
+                else:
+                    # Catch-all for any other tools
+                    logger.debug(f"Unhandled tool '{tool_name}' with result: {result_data}")
+                    if isinstance(result_data, str) and result_data.strip():
+                        response_parts.append(result_data)
+                    elif isinstance(result_data, dict) and result_data:
+                        # Try to extract meaningful content from dict
+                        if "output" in result_data:
+                            response_parts.append(str(result_data["output"]))
+                        elif "result" in result_data:
+                            response_parts.append(str(result_data["result"]))
+                        else:
+                            # Show the whole dict in a readable format
+                            response_parts.append(json.dumps(result_data, indent=2))
         
         if not response_parts:
             response_parts.append("Task completed successfully.")
