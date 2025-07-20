@@ -73,3 +73,6 @@ sample_*.txt
 !aida/tests/**/test_*.py
 !tests/**/test_*.py
 !**/tests/**/test_*.py
+
+# Exception: Include smoke test in root
+!smoke_test.py
