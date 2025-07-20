@@ -498,8 +498,7 @@ class TodoOrchestrator:
             # Execute the plan
             result = await self.execute_plan(
                 plan,
-                progress_callback=wrapped_progress if progress_callback else None,
-                save_progress=True
+                progress_callback=wrapped_progress if progress_callback else None
             )
             
             # Convert to expected format

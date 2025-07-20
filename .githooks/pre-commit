@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Pre-commit hook - Runs smoke tests before allowing commit
+
+echo "Running smoke tests..."
+uv run python smoke_test.py
+
+if [ $? -ne 0 ]; then
+    echo ""
+    echo "❌ COMMIT BLOCKED: Smoke tests failed!"
+    echo "Fix the issues above before committing."
+    exit 1
+fi
+
+echo "✅ Smoke tests passed"
+exit 0
