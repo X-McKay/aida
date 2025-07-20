@@ -157,7 +157,10 @@ class TodoOrchestrator:
             
             # Execute step
             if progress_callback:
-                progress_callback(plan, next_step)
+                if asyncio.iscoroutinefunction(progress_callback):
+                    await progress_callback(plan, next_step)
+                else:
+                    progress_callback(plan, next_step)
             
             step_result = await self._execute_step(next_step, plan)
             results.append(step_result)
@@ -469,3 +472,74 @@ class TodoOrchestrator:
         if not self._tools_initialized:
             # Tools should be initialized via the registry
             self._tools_initialized = True
+    
+    async def execute_request(
+        self, 
+        user_message: str,
+        context: Optional[Dict[str, Any]] = None,
+        progress_callback: Optional[callable] = None
+    ) -> Dict[str, Any]:
+        """Execute a user request - compatibility method for chat interface."""
+        try:
+            # Create a plan
+            plan = await self.create_plan(user_message, context)
+            
+            # Create a progress wrapper if callback provided
+            async def wrapped_progress(plan, step):
+                if progress_callback:
+                    # Convert to workflow format for compatibility
+                    workflow = {
+                        "steps": [{"tool_name": s.tool, "parameters": s.parameters, "purpose": s.description} 
+                                 for s in plan.steps],
+                        "current_step": plan.steps.index(step) if step in plan.steps else 0
+                    }
+                    await progress_callback(workflow, step)
+            
+            # Execute the plan
+            result = await self.execute_plan(
+                plan,
+                progress_callback=wrapped_progress if progress_callback else None,
+                save_progress=True
+            )
+            
+            # Convert to expected format
+            if result['status'] == 'completed':
+                return {
+                    "status": "completed",
+                    "workflow": {
+                        "analysis": plan.analysis,
+                        "expected_outcome": plan.expected_outcome,
+                        "steps": [s.to_dict() for s in plan.steps]
+                    },
+                    "results": [
+                        {
+                            "step": {
+                                "tool_name": step.tool,
+                                "parameters": step.parameters,
+                                "purpose": step.description
+                            },
+                            "success": step.status == TodoStatus.COMPLETED,
+                            "result": step.result
+                        }
+                        for step in plan.steps
+                    ],
+                    "execution_summary": result.get('execution_summary', {})
+                }
+            else:
+                return {
+                    "status": "failed",
+                    "error": result.get('message', 'Unknown error'),
+                    "workflow": {},
+                    "results": []
+                }
+                
+        except Exception as e:
+            import traceback
+            logger.error(f"Error in execute_request: {e}")
+            logger.error(traceback.format_exc())
+            return {
+                "status": "failed",
+                "error": str(e),
+                "workflow": {},
+                "results": []
+            }
