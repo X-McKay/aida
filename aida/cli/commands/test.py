@@ -26,7 +26,9 @@ def list():
     
     suite_descriptions = {
         "llm": "LLM system with PydanticAI integration",
-        "orchestrator": "Todo Orchestrator with real LLM calls"
+        "orchestrator": "Todo Orchestrator with real LLM calls",
+        "hybrid_files": "Hybrid FileOperationsTool with multi-framework support",
+        "hybrid_system": "Hybrid SystemTool with secure command execution"
     }
     
     for suite_name in test_registry.list_suites():

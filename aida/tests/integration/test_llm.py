@@ -9,8 +9,8 @@ from aida.config.llm_profiles import Purpose
 class LLMTestSuite(BaseTestSuite):
     """Test suite for LLM functionality."""
     
-    def __init__(self, verbose: bool = False):
-        super().__init__("LLM Integration", verbose)
+    def __init__(self, verbose: bool = False, persist_files: bool = False):
+        super().__init__("LLM Integration", verbose, persist_files)
     
     async def test_basic_chat(self) -> Dict[str, Any]:
         """Test basic LLM chat functionality."""

@@ -1,30 +1,38 @@
-"""Task execution tool using Dagger.io for containerized execution."""
+"""Task execution tool using Dagger.io for containerized execution with hybrid architecture."""
 
 import asyncio
 import tempfile
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union, Callable
 from pathlib import Path
 import logging
 from datetime import datetime
+import json
 
 import dagger
+from pydantic_ai import RunContext
+from pydantic import BaseModel
+from mcp.types import Tool as MCPTool, CallToolResult as MCPToolResult, TextContent
+from opentelemetry import trace, metrics
+from opentelemetry.trace import Status, StatusCode
 
-from aida.tools.base import Tool, ToolResult, ToolError, ToolCapability, ToolParameter
+from aida.tools.base import Tool, ToolResult, ToolError, ToolCapability, ToolParameter, ToolStatus
 
 
 logger = logging.getLogger(__name__)
 
 
 class ExecutionTool(Tool):
-    """Tool for executing tasks in secure containerized environments."""
+    """Tool for executing tasks in secure containerized environments with hybrid architecture."""
     
     def __init__(self):
         super().__init__(
             name="execution",
             description="Execute code and commands in secure containerized environments",
-            version="1.0.0"
+            version="2.0.0"
         )
+        self._mcp_server = None
+        self._observability = None
     
     def get_capability(self) -> ToolCapability:
         """Get tool capability descriptor."""
@@ -170,21 +178,21 @@ class ExecutionTool(Tool):
             logger.info(f"✅ Container execution completed in {elapsed:.2f}s")
                 
             return ToolResult(
-                    tool_name=self.name,
-                    execution_id="",  # Will be set by base class
-                    status="completed",
-                    result=result,
-                    started_at=start_time,
-                    completed_at=datetime.utcnow(),
-                    duration_seconds=elapsed,
-                    metadata={
-                        "language": language,
-                        "timeout": timeout,
-                        "memory_limit": memory_limit,
-                        "files_count": len(files),
-                        "packages_count": len(packages)
-                    }
-                )
+                tool_name=self.name,
+                execution_id="",  # Will be set by base class
+                status=ToolStatus.COMPLETED,
+                result=result,
+                started_at=start_time,
+                completed_at=datetime.utcnow(),
+                duration_seconds=elapsed,
+                metadata={
+                    "language": language,
+                    "timeout": timeout,
+                    "memory_limit": memory_limit,
+                    "files_count": len(files),
+                    "packages_count": len(packages)
+                }
+            )
                 
         except asyncio.TimeoutError:
             logger.error("⏱️ Container operation timed out")
@@ -199,7 +207,7 @@ class ExecutionTool(Tool):
             return ToolResult(
                 tool_name=self.name,
                 execution_id="",
-                status="completed",
+                status=ToolStatus.COMPLETED,
                 result={
                     "stdout": f"[Note: Container execution unavailable, showing script content instead]\n\n{code}\n",
                     "stderr": "",
@@ -538,4 +546,364 @@ class ExecutionTool(Tool):
             raise ToolError(
                 f"Failed to execute notebook: {str(e)}",
                 "NOTEBOOK_EXECUTION_FAILED"
+            )
+    
+    # ========== PydanticAI Interface ==========
+    
+    def to_pydantic_tools(self) -> Dict[str, Callable]:
+        """Convert to PydanticAI-compatible tools."""
+        
+        async def execute_code(
+            ctx: RunContext,
+            language: str,
+            code: str,
+            files: Optional[Dict[str, str]] = None,
+            timeout: int = 300,
+            memory_limit: str = "512m",
+            env_vars: Optional[Dict[str, str]] = None,
+            packages: Optional[List[str]] = None,
+            working_dir: str = "/workspace"
+        ) -> Dict[str, Any]:
+            """Execute code in a secure containerized environment.
+            
+            Args:
+                language: Programming language (python, javascript, bash, etc.)
+                code: Code to execute
+                files: Additional files to include
+                timeout: Execution timeout in seconds
+                memory_limit: Memory limit (e.g., '512m', '1g')
+                env_vars: Environment variables
+                packages: Additional packages to install
+                working_dir: Working directory inside container
+                
+            Returns:
+                Execution result with stdout, stderr, exit_code
+            """
+            result = await self.execute(
+                language=language,
+                code=code,
+                files=files or {},
+                timeout=timeout,
+                memory_limit=memory_limit,
+                env_vars=env_vars or {},
+                packages=packages or [],
+                working_dir=working_dir
+            )
+            
+            if result.status == ToolStatus.COMPLETED:
+                return result.result
+            else:
+                raise Exception(f"Execution failed: {result.error}")
+        
+        async def execute_python(
+            ctx: RunContext,
+            code: str,
+            packages: Optional[List[str]] = None,
+            timeout: int = 300
+        ) -> Dict[str, Any]:
+            """Execute Python code in a containerized environment.
+            
+            Args:
+                code: Python code to execute
+                packages: Python packages to install (e.g., ['numpy', 'pandas'])
+                timeout: Execution timeout in seconds
+                
+            Returns:
+                Execution result with stdout, stderr, exit_code
+            """
+            return await execute_code(
+                ctx,
+                language="python",
+                code=code,
+                packages=packages,
+                timeout=timeout
+            )
+        
+        async def execute_bash(
+            ctx: RunContext,
+            script: str,
+            packages: Optional[List[str]] = None,
+            timeout: int = 300
+        ) -> Dict[str, Any]:
+            """Execute bash script in a containerized environment.
+            
+            Args:
+                script: Bash script to execute
+                packages: System packages to install (e.g., ['curl', 'jq'])
+                timeout: Execution timeout in seconds
+                
+            Returns:
+                Execution result with stdout, stderr, exit_code
+            """
+            return await execute_code(
+                ctx,
+                language="bash",
+                code=script,
+                packages=packages,
+                timeout=timeout
+            )
+        
+        async def execute_javascript(
+            ctx: RunContext,
+            code: str,
+            packages: Optional[List[str]] = None,
+            timeout: int = 300
+        ) -> Dict[str, Any]:
+            """Execute JavaScript code in a containerized environment.
+            
+            Args:
+                code: JavaScript code to execute
+                packages: NPM packages to install (e.g., ['axios', 'lodash'])
+                timeout: Execution timeout in seconds
+                
+            Returns:
+                Execution result with stdout, stderr, exit_code
+            """
+            return await execute_code(
+                ctx,
+                language="javascript",
+                code=code,
+                packages=packages,
+                timeout=timeout
+            )
+        
+        return {
+            "execute_code": execute_code,
+            "execute_python": execute_python,
+            "execute_bash": execute_bash,
+            "execute_javascript": execute_javascript
+        }
+    
+    def register_with_pydantic_agent(self, agent: Any) -> None:
+        """Register tools with a PydanticAI agent."""
+        tools = self.to_pydantic_tools()
+        
+        for name, func in tools.items():
+            agent.tool(name=name)(func)
+    
+    # ========== MCP Server Interface ==========
+    
+    def get_mcp_server(self) -> 'ExecutionMCPServer':
+        """Get MCP server instance for this tool."""
+        if self._mcp_server is None:
+            self._mcp_server = ExecutionMCPServer(self)
+        return self._mcp_server
+    
+    # ========== OpenTelemetry Interface ==========
+    
+    def enable_observability(self, config: Dict[str, Any]) -> 'ExecutionObservability':
+        """Enable OpenTelemetry observability."""
+        if self._observability is None:
+            self._observability = ExecutionObservability(self, config)
+        return self._observability
+
+
+class ExecutionMCPServer:
+    """MCP server interface for ExecutionTool."""
+    
+    def __init__(self, tool: ExecutionTool):
+        self.tool = tool
+        self._tools = self._create_mcp_tools()
+    
+    def _create_mcp_tools(self) -> List[MCPTool]:
+        """Create MCP tool definitions."""
+        return [
+            MCPTool(
+                name="execution_execute_code",
+                description="Execute code in a secure containerized environment",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "language": {
+                            "type": "string",
+                            "description": "Programming language",
+                            "enum": ["python", "javascript", "bash", "node", "go", "rust", "java"]
+                        },
+                        "code": {
+                            "type": "string",
+                            "description": "Code to execute"
+                        },
+                        "files": {
+                            "type": "object",
+                            "description": "Additional files (filename -> content)",
+                            "additionalProperties": {"type": "string"}
+                        },
+                        "timeout": {
+                            "type": "integer",
+                            "description": "Execution timeout in seconds",
+                            "default": 300
+                        },
+                        "packages": {
+                            "type": "array",
+                            "description": "Additional packages to install",
+                            "items": {"type": "string"}
+                        }
+                    },
+                    "required": ["language", "code"]
+                }
+            ),
+            MCPTool(
+                name="execution_run_python",
+                description="Execute Python code in a containerized environment",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "code": {
+                            "type": "string",
+                            "description": "Python code to execute"
+                        },
+                        "packages": {
+                            "type": "array",
+                            "description": "Python packages to install",
+                            "items": {"type": "string"}
+                        },
+                        "timeout": {
+                            "type": "integer",
+                            "description": "Execution timeout in seconds",
+                            "default": 300
+                        }
+                    },
+                    "required": ["code"]
+                }
+            ),
+            MCPTool(
+                name="execution_run_bash",
+                description="Execute bash script in a containerized environment",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "script": {
+                            "type": "string",
+                            "description": "Bash script to execute"
+                        },
+                        "packages": {
+                            "type": "array",
+                            "description": "System packages to install",
+                            "items": {"type": "string"}
+                        },
+                        "timeout": {
+                            "type": "integer",
+                            "description": "Execution timeout in seconds",
+                            "default": 300
+                        }
+                    },
+                    "required": ["script"]
+                }
+            )
+        ]
+    
+    def list_tools(self) -> List[MCPTool]:
+        """List available MCP tools."""
+        return self._tools
+    
+    async def call_tool(self, name: str, arguments: Dict[str, Any]) -> MCPToolResult:
+        """Call an MCP tool."""
+        try:
+            if name == "execution_execute_code":
+                result = await self.tool.execute(**arguments)
+                
+            elif name == "execution_run_python":
+                result = await self.tool.execute(
+                    language="python",
+                    code=arguments["code"],
+                    packages=arguments.get("packages", []),
+                    timeout=arguments.get("timeout", 300)
+                )
+                
+            elif name == "execution_run_bash":
+                result = await self.tool.execute(
+                    language="bash",
+                    code=arguments["script"],
+                    packages=arguments.get("packages", []),
+                    timeout=arguments.get("timeout", 300)
+                )
+                
+            else:
+                return MCPToolResult(
+                    content=[TextContent(type="text", text=f"Unknown tool: {name}")],
+                    isError=True
+                )
+            
+            if result.status == ToolStatus.COMPLETED:
+                return MCPToolResult(
+                    content=[TextContent(type="text", text=json.dumps(result.result))],
+                    isError=False
+                )
+            else:
+                return MCPToolResult(
+                    content=[TextContent(type="text", text=result.error)],
+                    isError=True
+                )
+                
+        except Exception as e:
+            return MCPToolResult(
+                content=[TextContent(type="text", text=str(e))],
+                isError=True
+            )
+
+
+class ExecutionObservability:
+    """OpenTelemetry observability for ExecutionTool."""
+    
+    def __init__(self, tool: ExecutionTool, config: Dict[str, Any]):
+        self.tool = tool
+        self.config = config
+        
+        # Initialize tracer
+        self.tracer = trace.get_tracer(
+            "aida.tools.execution",
+            tool.version
+        )
+        
+        # Initialize metrics
+        meter = metrics.get_meter(
+            "aida.tools.execution",
+            tool.version
+        )
+        
+        self.execution_counter = meter.create_counter(
+            "execution.operations",
+            description="Number of code executions",
+            unit="1"
+        )
+        
+        self.execution_duration = meter.create_histogram(
+            "execution.duration",
+            description="Code execution duration",
+            unit="s"
+        )
+        
+        self.execution_errors = meter.create_counter(
+            "execution.errors",
+            description="Number of execution errors",
+            unit="1"
+        )
+    
+    def trace_execution(self, language: str, code_size: int):
+        """Create a trace span for code execution."""
+        return self.tracer.start_as_current_span(
+            "execute_code",
+            attributes={
+                "language": language,
+                "code_size": code_size,
+                "tool": "execution"
+            }
+        )
+    
+    def record_execution(self, language: str, duration: float, success: bool):
+        """Record execution metrics."""
+        self.execution_counter.add(
+            1,
+            {"language": language, "success": str(success)}
+        )
+        
+        if success:
+            self.execution_duration.record(
+                duration,
+                {"language": language}
+            )
+        else:
+            self.execution_errors.add(
+                1,
+                {"language": language}
             )

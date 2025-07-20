@@ -1,4 +1,4 @@
-"""File operations tool suite for AIDA with hybrid architecture support."""
+"""File operations tool with hybrid architecture."""
 
 import asyncio
 import os
@@ -18,10 +18,9 @@ logger = logging.getLogger(__name__)
 
 
 class FileOperationsTool(Tool):
-    """Comprehensive file operations tool with hybrid architecture support.
+    """Comprehensive file operations tool with hybrid architecture.
     
     Supports:
-    - Original AIDA tool interface
     - PydanticAI tool compatibility
     - MCP server integration
     - OpenTelemetry observability

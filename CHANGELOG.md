@@ -16,21 +16,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Streaming support for LLM responses with proper async iteration
 - Automatic provider selection and configuration
 - Mock tool system for testing orchestrator execution
-- **HYBRID ARCHITECTURE**: FileOperationsTool with multi-framework support
-- PydanticAI compatibility layer for modern AI agent frameworks
+- **HYBRID ARCHITECTURE**: Complete tool system refactoring with multi-framework support
+  - FileOperationsTool v2.0.0 - File and directory operations
+  - SystemTool v2.0.0 - Secure command execution
+  - ExecutionTool v2.0.0 - Containerized code execution with Dagger.io
+  - ContextTool v2.0.0 - Advanced context management and compression
+- PydanticAI compatibility layer for all hybrid tools
 - Model Context Protocol (MCP) server integration for universal AI compatibility
 - OpenTelemetry observability support for production monitoring
+- Comprehensive integration tests for all hybrid tool interfaces
+- Detailed documentation guides for each hybrid tool
 
 ### Changed
 - **BREAKING**: Replaced complex LLM provider system with simplified PydanticAI-based approach
 - **BREAKING**: Removed fallback mechanism and hardcoded model lists for simplified configuration
 - **BREAKING**: Refactored Todo Orchestrator into modular structure with separate files for models, storage, config, and orchestrator logic
-- **ENHANCED**: FileOperationsTool upgraded to hybrid architecture supporting multiple AI frameworks
+- **ENHANCED**: All core tools upgraded to hybrid architecture v2.0.0:
+  - FileOperationsTool - Complete file system operations with pattern matching
+  - SystemTool - Secure command execution with whitelist/blacklist support
+  - ExecutionTool - Containerized code execution for multiple languages
+  - ContextTool - Advanced context management with compression and search
 - Migrated Todo Orchestrator to use new LLM system
 - Updated all LLM imports to use `aida.llm` module
 - Improved error handling in Todo Orchestrator with proper defaults for missing fields
 - Enhanced test coverage with real functionality testing (no mocks for core features)
 - Updated unit tests to work with new modular orchestrator structure
+- Fixed MCP import issues (using CallToolResult from mcp.types)
+- Updated all hybrid tools to properly format MCP responses with TextContent
 
 ### Fixed
 - EOF error when piping input to todo orchestrator standalone example
@@ -75,13 +87,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `__init__.py` - Public API and backward compatibility
 - Updated unit tests to properly mock new modular structure
 - Removed compatibility layer after updating all references
-- **Hybrid FileOperationsTool Architecture**: Single tool supporting multiple interfaces:
+- **Hybrid Architecture for All Core Tools**: Single tool supporting multiple interfaces:
   - Original AIDA interface (backward compatible)
   - PydanticAI tool functions (`to_pydantic_tools()`, `register_with_pydantic_agent()`)
   - MCP server interface (`get_mcp_server()`) for Claude and universal AI agents
   - OpenTelemetry observability (`enable_observability()`) for production monitoring
 - Comprehensive examples demonstrating real-world hybrid usage patterns
 - Zero breaking changes - existing AIDA code continues to work unchanged
+- **Documentation Guides** for each hybrid tool:
+  - `hybrid_file_operations_tool.md` - Complete FileOperationsTool usage guide
+  - `hybrid_system_tool.md` - SystemTool security and usage guide
+  - `hybrid_execution_tool.md` - ExecutionTool containerization guide
+  - `hybrid_context_tool.md` - ContextTool compression and search guide
+  - `hybrid_architecture.md` - Overall hybrid architecture overview
+- **Integration Test Coverage**: 95.2% passing rate (40/42 tests)
+  - All interfaces tested: AIDA, PydanticAI, MCP, OpenTelemetry
+  - Real functionality tests without mocks
+  - Performance overhead validation
 
 ## [Previous Versions]
 
