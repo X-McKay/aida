@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **ENHANCED CHAT MODE**: Complete CLI chat interface refactoring
+  - Renamed 'interactive' command to 'chat' for better user experience
+  - Streamlined command structure with single-character shortcuts (?, @, #, .)
+  - Session management with save/load functionality
+  - Multi-line input support (Ctrl+D to toggle)
+  - Context window management for maintaining conversation context
+  - Direct tool execution shortcuts (@tool_name syntax)
+  - Rich terminal UI with markdown rendering
+  - Auto-save sessions with restoration capability
+  - Progress indicators for long-running operations
+- Creative feature roadmap document inspired by Claude Code and Gemini CLI research
 - New simplified LLM system with PydanticAI integration
 - Purpose-based LLM routing (DEFAULT, CODING, REASONING, MULTIMODAL, QUICK)
 - Unified model interface supporting Ollama, OpenAI, Anthropic, and vLLM providers
