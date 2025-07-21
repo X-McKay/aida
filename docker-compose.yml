@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   aida:
@@ -13,7 +13,7 @@ services:
       - aida-logs:/app/logs
     ports:
       - "8000:8000"
-      - "8001:8001"  # Debug port
+      - "8001:8001" # Debug port
     environment:
       - AIDA_ENV=development
       - AIDA_LOG_LEVEL=DEBUG
@@ -101,11 +101,11 @@ services:
       - aida-network
     restart: unless-stopped
     command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-      - '--web.enable-lifecycle'
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/etc/prometheus/console_libraries"
+      - "--web.console.templates=/etc/prometheus/consoles"
+      - "--web.enable-lifecycle"
 
   grafana:
     image: grafana/grafana:latest

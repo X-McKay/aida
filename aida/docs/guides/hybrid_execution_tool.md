@@ -279,7 +279,7 @@ with observability.trace_execution("python", len(code)):
         code=code,
         packages=["numpy", "scipy"]
     )
-    
+
     # Record metrics
     observability.record_execution(
         "python",
@@ -405,7 +405,7 @@ with observability.trace_execution("python", len(code)):
            code=code,
            timeout=60
        )
-       
+
        if result.status == ToolStatus.COMPLETED:
            if result.result["exit_code"] == 0:
                print("Success:", result.result["stdout"])
@@ -413,7 +413,7 @@ with observability.trace_execution("python", len(code)):
                print("Error:", result.result["stderr"])
        else:
            print("Execution failed:", result.error)
-           
+
    except Exception as e:
        print(f"Tool error: {e}")
    ```
@@ -525,7 +525,7 @@ if exec_result.status == ToolStatus.COMPLETED:
 ```python
 async def run_analysis_pipeline(data_path: str):
     tool = ExecutionTool()
-    
+
     # Step 1: Data validation
     validation_result = await tool.execute(
         language="python",
@@ -533,13 +533,13 @@ async def run_analysis_pipeline(data_path: str):
 import json
 with open('data.json', 'r') as f:
     data = json.load(f)
-    
+
 # Validate structure
 required_fields = ['id', 'timestamp', 'value']
 for item in data:
     for field in required_fields:
         assert field in item, f"Missing field: {field}"
-        
+
 print(f"Validated {len(data)} records")
 """,
         files={
@@ -547,10 +547,10 @@ print(f"Validated {len(data)} records")
         },
         timeout=30
     )
-    
+
     if validation_result.result["exit_code"] != 0:
         raise ValueError("Data validation failed")
-    
+
     # Step 2: Process data
     process_result = await tool.execute(
         language="python",
@@ -577,7 +577,7 @@ print(json.dumps(stats, indent=2))
         },
         timeout=60
     )
-    
+
     return json.loads(process_result.result["stdout"])
 ```
 

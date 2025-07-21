@@ -68,6 +68,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Todo Orchestrator plan execution failure due to missing 'tool' field in step data
 - Pattern matching issues in plan complexity tests
 - Import errors related to removed FallbackModel functionality
+- Integration test suite registration - tests were not being imported in runner
+- Orchestrator dependency parsing - now handles both string IDs and dict objects from LLM
+- LLM response parsing robustness - added retry mechanism for invalid JSON responses
+- Test execution mock import - removed non-existent examples module reference
+- Type checker (ty) errors - added proper type ignore comments following ty documentation
+- Pre-commit configuration - reverted to ruff-format from black
 
 ### Removed
 - Legacy LLM provider system (`aida.providers.llm`)

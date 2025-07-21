@@ -110,7 +110,7 @@ AIDA> I'll analyze PR#123 for you...
 # Automatic context relevance scoring
 # Visual indication of context usage
 aida> [████░░░░░░] 40% context used
-      
+
 # Smart context compression when approaching limits
 # Automatic archival of old context
 ```
@@ -197,9 +197,9 @@ AIDA> Based on your changes:
   - Fixed authentication bug in login flow
   - Added input validation
   - Updated tests
-  
+
   Suggested message: "fix: resolve authentication issue with proper validation"
-  
+
 # Interactive rebase assistance
 > help me clean up my commits
 ```

@@ -2,9 +2,7 @@
 # Pre-commit hook - Runs smoke tests before allowing commit
 
 echo "Running smoke tests..."
-uv run python smoke_test.py
-
-if [ $? -ne 0 ]; then
+if ! uv run python smoke_test.py; then
     echo ""
     echo "❌ COMMIT BLOCKED: Smoke tests failed!"
     echo "Fix the issues above before committing."

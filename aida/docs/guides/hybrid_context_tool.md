@@ -267,18 +267,18 @@ with observability.trace_operation("compress", len(content)):
         content=content,
         compression_ratio=0.5
     )
-    
+
     # Record metrics
     observability.record_operation(
         "compress",
         result.duration_seconds,
         result.status == ToolStatus.COMPLETED
     )
-    
+
     # Record compression ratio
     actual_ratio = result.result["compression_stats"]["actual_ratio"]
     observability.record_compression(actual_ratio)
-    
+
     # Record token reduction
     efficiency = result.result["compression_stats"]["efficiency"]
     observability.record_token_reduction(efficiency)
@@ -451,7 +451,7 @@ with observability.trace_operation("compress", len(content)):
        content=content,
        max_tokens=original_tokens * 0.8
    )
-   
+
    # If needed, optimize further
    if still_too_large:
        result = await tool.execute(
@@ -487,13 +487,13 @@ try:
         content=content,
         compression_ratio=0.5
     )
-    
+
     if result.status == ToolStatus.COMPLETED:
         compressed = result.result["compressed_content"]
         stats = result.result["compression_stats"]
     else:
         print(f"Operation failed: {result.error}")
-        
+
 except FileNotFoundError as e:
     print(f"File not found: {e}")
 except ValueError as e:
@@ -515,7 +515,7 @@ if len(content) > 100000:  # Very large
         content=content,
         max_tokens=5000
     )
-    
+
     # Process each chunk
     processed_chunks = []
     for chunk in split_result.result["chunks"]:
@@ -525,7 +525,7 @@ if len(content) > 100000:  # Very large
             compression_ratio=0.5
         )
         processed_chunks.append(chunk_result.result["compressed_content"])
-    
+
     # Merge results
     merge_result = await tool.execute(
         operation="merge_contexts",
@@ -574,10 +574,10 @@ conversation_history = []
 
 async def manage_conversation(new_message: str):
     conversation_history.append(new_message)
-    
+
     # Check if context is getting large
     full_context = "\n".join(conversation_history)
-    
+
     if len(full_context) > 10000:  # Getting large
         # Compress older parts
         compress_result = await context_tool.execute(
@@ -586,7 +586,7 @@ async def manage_conversation(new_message: str):
             compression_ratio=0.5,
             preserve_priority="recent"
         )
-        
+
         # Use compressed context for LLM
         response = await chat(
             compress_result.result["compressed_content"],
@@ -594,7 +594,7 @@ async def manage_conversation(new_message: str):
         )
     else:
         response = await chat(full_context, purpose=Purpose.DEFAULT)
-    
+
     return response
 ```
 
@@ -606,19 +606,19 @@ async def manage_context_window(
     max_tokens: int = 4000
 ) -> str:
     tool = ContextTool()
-    
+
     # Join messages
     full_context = "\n".join(messages)
-    
+
     # Check token count
     token_result = await tool.execute(
         operation="optimize_tokens",
         content=full_context,
         max_tokens=max_tokens
     )
-    
+
     optimized = token_result.result["optimized_content"]
-    
+
     # If still too large, use compression
     if token_result.result["token_analysis"]["final_tokens"] > max_tokens:
         compress_result = await tool.execute(
@@ -628,7 +628,7 @@ async def manage_context_window(
             preserve_priority="important"
         )
         optimized = compress_result.result["compressed_content"]
-    
+
     return optimized
 ```
 
@@ -641,7 +641,7 @@ async def search_knowledge_base(
 ) -> List[Dict[str, Any]]:
     tool = ContextTool()
     results = []
-    
+
     for doc_id, content in knowledge_base.items():
         # Analyze relevance
         relevance_result = await tool.execute(
@@ -649,7 +649,7 @@ async def search_knowledge_base(
             content=content,
             search_query=query
         )
-        
+
         if relevance_result.result["relevance_level"] in ["high", "medium"]:
             # Extract relevant sections
             search_result = await tool.execute(
@@ -657,14 +657,14 @@ async def search_knowledge_base(
                 content=content,
                 search_query=query
             )
-            
+
             results.append({
                 "doc_id": doc_id,
                 "relevance": relevance_result.result["overall_relevance"],
                 "matches": search_result.result["top_matches"],
                 "insights": relevance_result.result["insights"]
             })
-    
+
     # Sort by relevance
     results.sort(key=lambda x: x["relevance"], reverse=True)
     return results

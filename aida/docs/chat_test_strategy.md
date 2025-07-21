@@ -99,7 +99,7 @@ Test scenarios that challenge the system:
 
 ### ❌ DO NOT:
 
-1. **Add Special Cases**: 
+1. **Add Special Cases**:
    ```python
    # WRONG: Never do this
    if question == "What is the capital of France?":
@@ -181,7 +181,7 @@ When adding new test questions:
       "average_time": 0.8
     },
     {
-      "category": "Single Tool Required", 
+      "category": "Single Tool Required",
       "success_rate": 93.3,
       "average_time": 1.2
     },

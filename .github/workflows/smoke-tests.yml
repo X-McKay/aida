@@ -2,44 +2,44 @@ name: Smoke Tests
 
 on:
   push:
-    branches: [ main, develop, feature/* ]
+    branches: [main, develop, feature/*]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   smoke-test:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - uses: actions/checkout@v3
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-    
-    - name: Install uv
-      run: |
-        curl -LsSf https://astral.sh/uv/install.sh | sh
-        echo "$HOME/.local/bin" >> $GITHUB_PATH
-    
-    - name: Install dependencies
-      run: |
-        uv venv
-        uv pip install -e .
-    
-    - name: Run smoke tests
-      run: |
-        uv run python smoke_test.py
-    
-    - name: Comment on PR if failed
-      if: failure() && github.event_name == 'pull_request'
-      uses: actions/github-script@v6
-      with:
-        script: |
-          github.rest.issues.createComment({
-            issue_number: context.issue.number,
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            body: '❌ Smoke tests failed! Please run `uv run python smoke_test.py` locally and fix issues before merging.'
-          })
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        run: |
+          uv venv
+          uv pip install -e .
+
+      - name: Run smoke tests
+        run: |
+          uv run python tests/scripts/smoke_test.py
+
+      - name: Comment on PR if failed
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '❌ Smoke tests failed! Please run `uv run python tests/scripts/smoke_test.py` locally and fix issues before merging.'
+            })

@@ -1,12 +1,9 @@
 """Configuration management commands for AIDA CLI."""
 
-import json
 from pathlib import Path
-from typing import Optional
 
-import typer
 from rich.table import Table
-from rich.panel import Panel
+import typer
 
 from aida.cli.ui.console import get_console
 
@@ -16,14 +13,14 @@ console = get_console()
 
 @config_app.command()
 def init(
-    config_file: Optional[Path] = typer.Option(None, "--file", "-f", help="Configuration file path")
+    config_file: Path | None = typer.Option(None, "--file", "-f", help="Configuration file path"),
 ):
     """Initialize AIDA configuration."""
     if not config_file:
         config_file = Path.cwd() / "aida.config.yaml"
-    
+
     console.print(f"[yellow]Initializing configuration: {config_file}[/yellow]")
-    
+
     # Create default configuration
     default_config = """# AIDA Configuration
 system:
@@ -48,7 +45,7 @@ tools:
     enabled: true
     timeout: 300
     sandbox: true
-  
+
 security:
   sandbox_enabled: true
   audit_logging: true
@@ -59,29 +56,29 @@ logging:
   file: "aida.log"
   max_size: "100MB"
 """
-    
+
     config_file.write_text(default_config)
     console.print(f"[success]✅ Configuration initialized: {config_file}[/success]")
 
 
 @config_app.command()
 def validate(
-    config_file: Optional[Path] = typer.Option(None, "--file", "-f", help="Configuration file path")
+    config_file: Path | None = typer.Option(None, "--file", "-f", help="Configuration file path"),
 ):
     """Validate AIDA configuration."""
     if not config_file:
         config_file = Path.cwd() / "aida.config.yaml"
-    
+
     console.print(f"[yellow]Validating configuration: {config_file}[/yellow]")
-    
+
     if not config_file.exists():
         console.print(f"[error]Configuration file not found: {config_file}[/error]")
         console.print("Use 'aida config init' to create a configuration file")
         raise typer.Exit(1)
-    
+
     # Simulate validation
     console.print("[success]✅ Configuration is valid[/success]")
-    
+
     validation_results = [
         ("System Configuration", "✅ Valid"),
         ("Agent Settings", "✅ Valid"),
@@ -89,32 +86,32 @@ def validate(
         ("Tool Configuration", "✅ Valid"),
         ("Security Settings", "✅ Valid"),
     ]
-    
+
     table = Table(title="Validation Results")
     table.add_column("Component", style="cyan")
     table.add_column("Status", style="green")
-    
+
     for component, status in validation_results:
         table.add_row(component, status)
-    
+
     console.print(table)
 
 
 @config_app.command()
 def show(
-    config_file: Optional[Path] = typer.Option(None, "--file", "-f", help="Configuration file path"),
-    section: Optional[str] = typer.Option(None, "--section", "-s", help="Show specific section")
+    config_file: Path | None = typer.Option(None, "--file", "-f", help="Configuration file path"),
+    section: str | None = typer.Option(None, "--section", "-s", help="Show specific section"),
 ):
     """Show current configuration."""
     if not config_file:
         config_file = Path.cwd() / "aida.config.yaml"
-    
+
     if not config_file.exists():
         console.print(f"[error]Configuration file not found: {config_file}[/error]")
         raise typer.Exit(1)
-    
+
     content = config_file.read_text()
-    
+
     if section:
         console.print(f"[bold]Configuration Section: {section}[/bold]")
         # Would parse YAML and show specific section
@@ -128,17 +125,17 @@ def show(
 def set(
     key: str,
     value: str,
-    config_file: Optional[Path] = typer.Option(None, "--file", "-f", help="Configuration file path")
+    config_file: Path | None = typer.Option(None, "--file", "-f", help="Configuration file path"),
 ):
     """Set a configuration value."""
     console.print(f"[yellow]Setting {key} = {value}[/yellow]")
-    console.print(f"[success]✅ Configuration updated[/success]")
+    console.print("[success]✅ Configuration updated[/success]")
 
 
 @config_app.command()
 def get(
     key: str,
-    config_file: Optional[Path] = typer.Option(None, "--file", "-f", help="Configuration file path")
+    config_file: Path | None = typer.Option(None, "--file", "-f", help="Configuration file path"),
 ):
     """Get a configuration value."""
     console.print(f"[bold]{key}:[/bold] example_value")

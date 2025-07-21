@@ -308,12 +308,12 @@ try:
         operation="read_file",
         path="/path/to/file.txt"
     )
-    
+
     if result.status == ToolStatus.COMPLETED:
         content = result.result["content"]
     else:
         print(f"Error: {result.error}")
-        
+
 except FileNotFoundError:
     print("File does not exist")
 except PermissionError:
@@ -416,7 +416,7 @@ await file_tool.execute(
 ```python
 async def process_csv_files(directory: str):
     tool = FileOperationsTool()
-    
+
     # Find all CSV files
     files = await tool.execute(
         operation="list_files",
@@ -424,7 +424,7 @@ async def process_csv_files(directory: str):
         pattern="*.csv",
         recursive=True
     )
-    
+
     results = []
     for file_info in files.result["files"]:
         # Read each file
@@ -432,11 +432,11 @@ async def process_csv_files(directory: str):
             operation="read_file",
             path=file_info["path"]
         )
-        
+
         # Process content
         processed = process_csv_content(content.result["content"])
         results.append(processed)
-        
+
         # Write processed file
         output_path = file_info["path"].replace(".csv", "_processed.csv")
         await tool.execute(
@@ -444,7 +444,7 @@ async def process_csv_files(directory: str):
             path=output_path,
             content=processed
         )
-    
+
     return results
 ```
 

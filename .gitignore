@@ -52,6 +52,9 @@ htmlcov/
 Thumbs.db
 ehthumbs.db
 
+# Node.js
+node_modules/
+
 # Logs
 *.log
 logs/
@@ -73,3 +76,6 @@ sample_*.txt
 !aida/tests/**/test_*.py
 !tests/**/test_*.py
 !**/tests/**/test_*.py
+
+# Exception: Include smoke test
+!tests/scripts/smoke_test.py
