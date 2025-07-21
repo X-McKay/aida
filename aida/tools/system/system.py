@@ -1,6 +1,7 @@
 """Main system tool implementation."""
 
 import asyncio
+from asyncio import subprocess
 from collections.abc import Callable
 from datetime import datetime
 import logging
@@ -11,6 +12,7 @@ import signal
 import sys
 import tempfile
 from typing import Any
+import uuid
 
 import psutil
 
@@ -34,6 +36,7 @@ class SystemTool(BaseModularTool[SystemRequest, SystemResponse, SystemConfig]):
     """Tool for secure system command execution and system operations."""
 
     def __init__(self):
+        """Initialize system tool for secure command execution."""
         super().__init__()
 
     def _get_tool_name(self) -> str:
@@ -98,8 +101,20 @@ class SystemTool(BaseModularTool[SystemRequest, SystemResponse, SystemConfig]):
         start_time = datetime.utcnow()
 
         try:
+            # Ensure operation is provided
+            if "operation" not in kwargs:
+                return ToolResult(
+                    tool_name=self.name,
+                    execution_id=str(uuid.uuid4()),
+                    status=ToolStatus.FAILED,
+                    error="Missing required parameter: operation",
+                    started_at=start_time,
+                    completed_at=datetime.utcnow(),
+                    metadata={"error_type": "validation_error"},
+                )
+
             # Create request model
-            request = SystemRequest(**kwargs)
+            request = SystemRequest(**kwargs)  # ty: ignore[missing-argument]
 
             # Route to appropriate operation
             response = await self._route_operation(request)
@@ -169,7 +184,7 @@ class SystemTool(BaseModularTool[SystemRequest, SystemResponse, SystemConfig]):
     async def _execute_command(self, request: SystemRequest) -> SystemResponse:
         """Execute a command."""
         # Security check
-        if not SystemConfig.is_command_allowed(request.command):
+        if request.command and not SystemConfig.is_command_allowed(request.command):
             return SystemResponse(
                 operation=request.operation,
                 success=False,
@@ -189,6 +204,12 @@ class SystemTool(BaseModularTool[SystemRequest, SystemResponse, SystemConfig]):
                 )
 
         # Prepare command
+        if not request.command:
+            return SystemResponse(
+                operation=request.operation,
+                success=False,
+                error="No command specified",
+            )
         cmd = [request.command] + (request.args or [])
 
         # Prepare environment
@@ -198,10 +219,12 @@ class SystemTool(BaseModularTool[SystemRequest, SystemResponse, SystemConfig]):
 
         # Execute command
         try:
-            process = await asyncio.create_subprocess_exec(
+            if not cmd:
+                raise ValueError("Empty command")
+            process = await asyncio.create_subprocess_exec(  # ty: ignore[missing-argument]
                 *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 cwd=request.cwd,
                 env=env,
             )
@@ -213,7 +236,7 @@ class SystemTool(BaseModularTool[SystemRequest, SystemResponse, SystemConfig]):
                 )
 
                 result = CommandResult(
-                    command=request.command,
+                    command=request.command or "",
                     args=request.args or [],
                     exit_code=process.returncode,
                     stdout=stdout.decode("utf-8", errors="replace"),
@@ -246,7 +269,7 @@ class SystemTool(BaseModularTool[SystemRequest, SystemResponse, SystemConfig]):
                     operation=request.operation,
                     success=False,
                     result=CommandResult(
-                        command=request.command,
+                        command=request.command or "",
                         args=request.args or [],
                         exit_code=-1,
                         stdout="",

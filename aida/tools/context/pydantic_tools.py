@@ -77,7 +77,7 @@ def create_pydantic_tools(context_tool) -> dict[str, Callable]:
         else:
             return {"optimized_content": result.result}
 
-    async def create_context_snapshot(content: str, file_path: str = None) -> dict[str, str]:
+    async def create_context_snapshot(content: str, file_path: str | None = None) -> dict[str, str]:
         """Create a snapshot of the current context."""
         result = await context_tool.execute(
             operation="snapshot", content=content, file_path=file_path

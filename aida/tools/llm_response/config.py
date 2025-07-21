@@ -32,7 +32,7 @@ class LLMResponseConfig:
     TRUNCATION_BUFFER = 3  # Characters to reserve for suffix
 
     @classmethod
-    def build_prompt(cls, question: str, context: str = "", max_length: int = None) -> str:
+    def build_prompt(cls, question: str, context: str = "", max_length: int | None = None) -> str:
         """Build the prompt for LLM."""
         if max_length is None:
             max_length = cls.DEFAULT_MAX_LENGTH

@@ -18,6 +18,7 @@ class LLMResponseTool(SimpleToolBase):
     """Tool for getting direct LLM responses to questions."""
 
     def __init__(self):
+        """Initialize LLM response tool with PydanticAI tools cache."""
         super().__init__()
         self._pydantic_tools_cache = {}
 
@@ -48,7 +49,7 @@ class LLMResponseTool(SimpleToolBase):
 
         # Build prompt
         prompt = LLMResponseConfig.build_prompt(
-            request.question, request.context, request.max_length
+            request.question, request.context or "", request.max_length
         )
 
         # Get LLM response

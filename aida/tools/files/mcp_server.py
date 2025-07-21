@@ -20,6 +20,7 @@ class FilesMCPServer(SimpleMCPServer):
         return {"content": [{"type": "text", "text": response_text}]}
 
     def __init__(self, files_tool):
+        """Initialize MCP server with file operations tool and operation definitions."""
         operations = {
             "read": {
                 "description": "Read file contents",

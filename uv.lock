@@ -116,6 +116,7 @@ dev = [
     { name = "detect-secrets" },
     { name = "ruff" },
     { name = "safety" },
+    { name = "ty" },
 ]
 
 [package.metadata]
@@ -152,7 +153,7 @@ requires-dist = [
     { name = "orjson", specifier = ">=3.9.0" },
     { name = "orjson", marker = "extra == 'performance'", specifier = ">=3.9.0" },
     { name = "pathspec", specifier = ">=0.11.0" },
-    { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.6.0" },
+    { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=4.2.0" },
     { name = "psutil", specifier = ">=5.9.0" },
     { name = "pydantic", specifier = ">=2.5.0" },
     { name = "pydantic-ai", specifier = ">=0.4.4" },
@@ -183,6 +184,7 @@ dev = [
     { name = "detect-secrets", specifier = ">=1.5.0" },
     { name = "ruff", specifier = ">=0.12.4" },
     { name = "safety", specifier = ">=3.2.9" },
+    { name = "ty", specifier = ">=0.0.1a15" },
 ]
 
 [[package]]

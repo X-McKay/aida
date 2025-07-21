@@ -23,6 +23,7 @@ class ExecutionTool(BaseModularTool[ExecutionRequest, ExecutionResponse, Executi
     """Tool for executing code in secure containerized environments."""
 
     def __init__(self):
+        """Initialize the execution tool with a Dagger client placeholder."""
         super().__init__()
         self._dagger_client = None
 
@@ -224,17 +225,20 @@ class ExecutionTool(BaseModularTool[ExecutionRequest, ExecutionResponse, Executi
                     )
 
     async def _install_packages(
-        self, container: dagger.Container, request: ExecutionRequest
-    ) -> dagger.Container:
+        self,
+        container: "dagger.Container",  # ty: ignore[possibly-unbound-attribute]
+        request: ExecutionRequest,  # ty: ignore[possibly-unbound-attribute]
+    ) -> "dagger.Container":  # ty: ignore[possibly-unbound-attribute]
         """Install packages in the container."""
-        pkg_manager = ExecutionConfig.PACKAGE_MANAGERS.get(request.language.value)
+        pkg_manager = ExecutionConfig.PACKAGE_MANAGERS.get(request.language.value)  # type: ignore[attr-defined]
         if not pkg_manager:
             return container
 
         # Install packages one by one
-        for package in request.packages:
-            command = pkg_manager["command"] + [package]
-            container = container.with_exec(command)
+        if request.packages:
+            for package in request.packages:
+                command = pkg_manager["command"] + [package]
+                container = container.with_exec(command)
 
         return container
 

@@ -83,9 +83,9 @@ class HybridFileOperationsTestSuite(BaseTestSuite):
                 operation="write", path=str(self.test_files["simple.txt"]), content=new_content
             )
 
-            assert (
-                write_result.status == ToolStatus.COMPLETED
-            ), f"Write failed: {write_result.error}"
+            assert write_result.status == ToolStatus.COMPLETED, (
+                f"Write failed: {write_result.error}"
+            )
             assert write_result.result["bytes_written"] == len(new_content)
 
             # Verify write
@@ -211,9 +211,9 @@ class HybridFileOperationsTestSuite(BaseTestSuite):
 
             assert "content" in read_result, f"No content in read result: {read_result}"
             assert len(read_result["content"]) > 0, f"Empty content list: {read_result}"
-            assert (
-                "text" in read_result["content"][0]
-            ), f"No text in content: {read_result['content'][0]}"
+            assert "text" in read_result["content"][0], (
+                f"No text in content: {read_result['content'][0]}"
+            )
 
             content_data = read_result["content"][0]["text"]
             self.log(f"Raw MCP response: {repr(content_data[:100])}...")

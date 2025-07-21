@@ -5,7 +5,7 @@ from collections.abc import Callable
 import contextlib
 from datetime import datetime
 import logging
-from typing import Any
+from typing import Any, cast
 import uuid
 
 from pydantic import BaseModel, Field
@@ -53,6 +53,13 @@ class EventSubscription:
         event_filter: EventFilter | None = None,
         subscription_id: str | None = None,
     ):
+        """Initialize an event subscription.
+
+        Args:
+            handler: Callable that processes events matching the filter.
+            event_filter: Optional filter to match specific events. If None, matches all events.
+            subscription_id: Optional custom ID for the subscription. Auto-generated if not provided.
+        """
         self.id = subscription_id or str(uuid.uuid4())
         self.handler = handler
         self.filter = event_filter
@@ -104,6 +111,12 @@ class EventBus:
     """Event bus for AIDA system."""
 
     def __init__(self, max_history: int = 1000):
+        """Initialize the event bus.
+
+        Args:
+            max_history: Maximum number of events to keep in history. Older events are
+                automatically removed when this limit is exceeded. Defaults to 1000.
+        """
         self.max_history = max_history
 
         # Subscriptions
@@ -319,7 +332,7 @@ def get_event_bus() -> EventBus:
     global _global_event_bus
     if _global_event_bus is None:
         _global_event_bus = EventBus()
-    return _global_event_bus
+    return cast(EventBus, _global_event_bus)
 
 
 async def emit_event(event: Event) -> None:

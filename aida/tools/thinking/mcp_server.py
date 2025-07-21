@@ -14,6 +14,11 @@ class ThinkingMCPServer(SimpleMCPServer):
     """MCP server wrapper for ThinkingTool."""
 
     def __init__(self, thinking_tool):
+        """Initialize the ThinkingMCPServer with the thinking tool.
+
+        Args:
+            thinking_tool: Instance of ThinkingTool to wrap with MCP protocol
+        """
         operations = {
             "analyze": {
                 "description": "Analyze problems using various reasoning methods",

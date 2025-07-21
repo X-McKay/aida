@@ -13,6 +13,11 @@ class ContextMCPServer:
     """MCP server wrapper for ContextTool."""
 
     def __init__(self, context_tool):
+        """Initialize MCP server with context tool.
+
+        Args:
+            context_tool: The context tool instance to wrap for MCP
+        """
         self.context_tool = context_tool
         self.server_info = {
             "name": "aida-context",

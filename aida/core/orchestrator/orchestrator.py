@@ -20,7 +20,14 @@ logger = logging.getLogger(__name__)
 class TodoOrchestrator:
     """TODO-based workflow orchestrator with progressive checking and re-evaluation."""
 
-    def __init__(self, storage_dir: str = None):
+    def __init__(self, storage_dir: str | None = None):
+        """Initialize the TODO orchestrator.
+
+        Args:
+            storage_dir: Optional directory path for storing workflow plans.
+                If not provided, uses the default storage directory from config.
+                Plans are persisted here for recovery and historical analysis.
+        """
         self.tool_registry = get_tool_registry()
         self.active_plans: dict[str, TodoPlan] = {}
         self.storage_manager = PlanStorageManager(
@@ -33,7 +40,6 @@ class TodoOrchestrator:
         self, user_request: str, context: dict[str, Any] | None = None
     ) -> TodoPlan:
         """Create a new TODO-based workflow plan."""
-
         if not self._tools_initialized:
             await self._ensure_tools_initialized()
 
@@ -100,22 +106,33 @@ class TodoOrchestrator:
 
         for i, step_data in enumerate(plan_data.get("execution_plan", [])):
             if not isinstance(step_data, dict):
-                raise ValueError(f"Step {i+1} is not a valid dictionary")
+                raise ValueError(f"Step {i + 1} is not a valid dictionary")
 
             for field in OrchestratorConfig.REQUIRED_STEP_FIELDS:
                 if field not in step_data or not step_data[field]:
-                    raise ValueError(f"Step {i+1} missing required '{field}' field")
+                    raise ValueError(f"Step {i + 1} missing required '{field}' field")
 
             step_id = f"step_{self._step_counter:03d}"
             self._step_counter += 1
 
+            # Handle dependencies - they should be step IDs (strings)
+            raw_dependencies = step_data.get("dependencies", [])
+            dependencies = []
+            for dep in raw_dependencies:
+                if isinstance(dep, str):
+                    dependencies.append(dep)
+                elif isinstance(dep, dict) and "id" in dep:
+                    # If LLM returns dict objects, extract the ID
+                    dependencies.append(dep["id"])
+                # Skip invalid dependencies
+
             step = TodoStep(
                 id=step_id,
-                description=step_data.get("description", f"Step {i+1}"),
+                description=step_data.get("description", f"Step {i + 1}"),
                 tool_name=step_data.get("tool_name")
                 or step_data.get("tool", OrchestratorConfig.DEFAULT_TOOL_NAME),
                 parameters=step_data.get("parameters", {}),
-                dependencies=step_data.get("dependencies", []),
+                dependencies=dependencies,
                 max_retries=OrchestratorConfig.DEFAULT_MAX_RETRIES,
             )
             steps.append(step)
@@ -129,14 +146,13 @@ class TodoOrchestrator:
         replan_callback: Callable[[TodoPlan, ReplanReason], bool] | None = None,
     ) -> dict[str, Any]:
         """Execute a TODO plan with progressive checking and re-evaluation."""
-
         results = []
 
         while True:
             # Check if we should replan
             should_replan, reason = plan.should_replan()
             if should_replan and reason != ReplanReason.PERIODIC_CHECK:
-                logger.info(f"Replanning needed: {reason.value}")
+                logger.info(f"Replanning needed: {reason.value if reason else 'unknown'}")
 
                 # Ask callback if we should replan
                 if replan_callback and not replan_callback(plan, reason):
@@ -230,7 +246,7 @@ class TodoOrchestrator:
         """Clean up old plans."""
         return self.storage_manager.cleanup_old_plans(days_old)
 
-    def export_summary_report(self, output_file: str = None) -> str:
+    def export_summary_report(self, output_file: str | None = None) -> str:
         """Export a summary report of all plans."""
         return self.storage_manager.export_plan_summary(output_file)
 
@@ -280,9 +296,11 @@ class TodoOrchestrator:
             return {
                 "step_id": step.id,
                 "success": step.status == TodoStatus.COMPLETED,
-                "result": result.model_dump()
-                if result and hasattr(result, "model_dump")
-                else (result.dict() if result and hasattr(result, "dict") else result),
+                "result": (
+                    result.model_dump()
+                    if result and hasattr(result, "model_dump")
+                    else (result.dict() if result and hasattr(result, "dict") else result)
+                ),
             }
 
         except Exception as e:
@@ -314,9 +332,8 @@ class TodoOrchestrator:
 
     async def _generate_initial_plan(
         self, user_request: str, context: dict[str, Any]
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any]:  # ty: ignore[invalid-return-type]
         """Generate initial plan using LLM."""
-
         # Get available tools
         available_tools = await self.tool_registry.list_tools()
         tool_specs = await self._get_tool_specifications(available_tools)
@@ -324,34 +341,52 @@ class TodoOrchestrator:
         # Create planning prompt
         planning_prompt = self._create_todo_planning_prompt(user_request, tool_specs, context)
 
-        try:
-            # Use configured LLM model
-            response = await chat(planning_prompt, purpose=OrchestratorConfig.LLM_PURPOSE)
+        # Try up to 2 times to get a valid response
+        for attempt in range(2):
+            try:
+                # Use configured LLM model
+                response = await chat(planning_prompt, purpose=OrchestratorConfig.LLM_PURPOSE)
 
-            # Debug: Log the raw response
-            logger.debug(f"Raw LLM response: {response[:500]}...")
+                # Debug: Log the raw response
+                logger.debug(f"Raw LLM response: {response[:500]}...")
 
-            # Parse JSON response
-            json_content = self._extract_json_from_response(response)
-            plan_data = json.loads(json_content)
+                # Parse JSON response
+                json_content = self._extract_json_from_response(response)
+                plan_data = json.loads(json_content)
 
-            return plan_data
+                # Validate the plan data
+                self._validate_plan_data(plan_data)
 
-        except Exception as e:
-            logger.error(f"Failed to generate plan: {e}")
-            logger.debug(
-                f"Raw LLM response causing error: {response[:1000] if 'response' in locals() else 'No response'}"
-            )
-            # Don't return a fallback plan - raise a clear error instead
-            raise RuntimeError(
-                f"Plan generation failed: {e}. The LLM did not return a valid JSON response. Please check your LLM configuration and try again."
-            )
+                return plan_data
+
+            except (json.JSONDecodeError, ValueError) as e:
+                logger.error(f"Failed to parse plan on attempt {attempt + 1}: {e}")
+                logger.debug(
+                    f"Raw LLM response causing error: {response[:1000] if 'response' in locals() else 'No response'}"
+                )
+
+                if attempt == 0:
+                    # Add more explicit instructions for retry
+                    planning_prompt = (
+                        planning_prompt
+                        + "\n\nIMPORTANT: Respond ONLY with the JSON object. Do not include any explanatory text before or after the JSON."
+                    )
+                else:
+                    # Final attempt failed
+                    raise RuntimeError(
+                        f"Plan generation failed: {e}. The LLM did not return a valid JSON response. Please check your LLM configuration and try again."
+                    )
+            except Exception as e:
+                # Non-parsing errors should fail immediately
+                logger.error(f"Failed to generate plan: {e}")
+                raise RuntimeError(
+                    f"Plan generation failed: {e}. Please check your LLM configuration and try again."
+                )
 
     def _create_todo_planning_prompt(
         self, user_request: str, tool_specs: dict, context: dict[str, Any]
     ) -> str:
         """Create a planning prompt focused on TODO-style output."""
-
         tools_info = []
         for name, spec in tool_specs.items():
             params = []
@@ -406,7 +441,7 @@ class TodoOrchestrator:
             response_text = str(response)
 
         # Look for JSON code blocks first
-        if "```json" in response_text:
+        if isinstance(response_text, str) and "```json" in response_text:
             start = response_text.find("```json") + 7
             end = response_text.find("```", start)
             if end != -1:
@@ -419,7 +454,7 @@ class TodoOrchestrator:
                     pass
 
         # Look for JSON code blocks without language specification
-        if "```" in response_text:
+        if isinstance(response_text, str) and "```" in response_text:
             lines = response_text.split("\n")
             in_code_block = False
             json_lines = []
@@ -442,48 +477,57 @@ class TodoOrchestrator:
                     json_lines.append(line)
 
         # Look for JSON objects with proper bracket matching
-        brace_count = 0
-        start_pos = -1
+        if isinstance(response_text, str):
+            brace_count = 0
+            start_pos = -1
 
-        for i, char in enumerate(response_text):
-            if char == "{":
-                if start_pos == -1:
-                    start_pos = i
-                brace_count += 1
-            elif char == "}":
-                brace_count -= 1
-                if brace_count == 0 and start_pos != -1:
-                    json_content = response_text[start_pos : i + 1]
-                    try:
-                        json.loads(json_content)
-                        return json_content
-                    except json.JSONDecodeError:
-                        # Reset and continue looking
-                        start_pos = -1
-                        brace_count = 0
+            for i, char in enumerate(response_text):
+                if char == "{":
+                    if start_pos == -1:
+                        start_pos = i
+                    brace_count += 1
+                elif char == "}":
+                    brace_count -= 1
+                    if brace_count == 0 and start_pos != -1:
+                        json_content = response_text[start_pos : i + 1]
+                        try:
+                            json.loads(json_content)
+                            return json_content
+                        except json.JSONDecodeError:
+                            # Reset and continue looking
+                            start_pos = -1
+                            brace_count = 0
 
         # Debug: Log more details about what we tried to parse
-        logger.debug(f"JSON extraction failed. Response length: {len(response_text)}")
-        logger.debug(f"Response starts with: {response_text[:100]}...")
-        logger.debug(f"Response ends with: ...{response_text[-100:]}")
+        if isinstance(response_text, str):
+            logger.debug(f"JSON extraction failed. Response length: {len(response_text)}")
+            logger.debug(f"Response starts with: {response_text[:100]}...")
+            logger.debug(f"Response ends with: ...{response_text[-100:]}")
+        else:
+            logger.debug(f"JSON extraction failed. Response type: {type(response_text)}")
 
         # Try one more approach: look for any JSON-like structure
-        import re
+        if isinstance(response_text, str):
+            import re
 
-        json_pattern = r"\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}"
-        matches = re.findall(json_pattern, response_text, re.DOTALL)
+            json_pattern = r"\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}"
+            matches = re.findall(json_pattern, response_text, re.DOTALL)
 
-        for match in matches:
-            try:
-                json.loads(match)
-                logger.debug(f"Found valid JSON with regex: {len(match)} chars")
-                return match
-            except json.JSONDecodeError:
-                continue
+            for match in matches:
+                try:
+                    json.loads(match)
+                    logger.debug(f"Found valid JSON with regex: {len(match)} chars")
+                    return match
+                except json.JSONDecodeError:
+                    continue
 
-        raise ValueError(
-            f"No valid JSON found in response. Response length: {len(response_text)}, preview: {response_text[:200]}..."
-        )
+            raise ValueError(
+                f"No valid JSON found in response. Response length: {len(response_text)}, preview: {response_text[:200]}..."
+            )
+        else:
+            raise ValueError(
+                f"No valid JSON found in response. Response type: {type(response_text)}"
+            )
 
     async def _replan(self, plan: TodoPlan, reason: ReplanReason):
         """Re-evaluate and update the plan."""
@@ -520,7 +564,7 @@ class TodoOrchestrator:
         self,
         user_message: str,
         context: dict[str, Any] | None = None,
-        progress_callback: callable | None = None,
+        progress_callback: Callable | None = None,
     ) -> dict[str, Any]:
         """Execute a user request - compatibility method for chat interface."""
         try:
@@ -587,9 +631,11 @@ class TodoOrchestrator:
                                 "purpose": step.description,
                             },
                             "success": step.status == TodoStatus.COMPLETED,
-                            "result": step.result.model_dump()
-                            if step.result and hasattr(step.result, "model_dump")
-                            else step.result,
+                            "result": (
+                                step.result.model_dump()
+                                if step.result and hasattr(step.result, "model_dump")
+                                else step.result
+                            ),
                         }
                         for step in plan.steps
                     ],

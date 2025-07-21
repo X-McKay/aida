@@ -47,11 +47,14 @@ class TodoStep(BaseModel):
     max_retries: int = 2
 
     class Config:
+        """Pydantic configuration for TodoStep model."""
+
         arbitrary_types_allowed = True  # Allow ToolResult type
 
     @field_validator("description")
     @classmethod
     def description_must_not_be_empty(cls, v):
+        """Validate that description is not empty."""
         if not v or not v.strip():
             raise ValueError("Description cannot be empty")
         return v.strip()
@@ -59,6 +62,7 @@ class TodoStep(BaseModel):
     @field_validator("tool_name")
     @classmethod
     def tool_name_must_be_valid(cls, v):
+        """Validate that tool name is not empty."""
         if not v or not v.strip():
             raise ValueError("Tool name cannot be empty")
         return v.strip()
@@ -66,6 +70,7 @@ class TodoStep(BaseModel):
     @field_validator("retry_count")
     @classmethod
     def retry_count_must_be_non_negative(cls, v):
+        """Validate that retry count is non-negative."""
         if v < 0:
             raise ValueError("Retry count must be non-negative")
         return v
@@ -73,6 +78,7 @@ class TodoStep(BaseModel):
     @field_validator("max_retries")
     @classmethod
     def max_retries_must_be_non_negative(cls, v):
+        """Validate that max retries is non-negative."""
         if v < 0:
             raise ValueError("Max retries must be non-negative")
         return v
@@ -82,13 +88,17 @@ class TodoStep(BaseModel):
         checkbox = (
             "[x]"
             if self.status == TodoStatus.COMPLETED
-            else "[!]"
-            if self.status == TodoStatus.FAILED
-            else "[~]"
-            if self.status == TodoStatus.IN_PROGRESS
-            else "[-]"
-            if self.status == TodoStatus.SKIPPED
-            else "[ ]"
+            else (
+                "[!]"
+                if self.status == TodoStatus.FAILED
+                else (
+                    "[~]"
+                    if self.status == TodoStatus.IN_PROGRESS
+                    else "[-]"
+                    if self.status == TodoStatus.SKIPPED
+                    else "[ ]"
+                )
+            )
         )
 
         suffix = ""
@@ -172,11 +182,14 @@ class TodoPlan(BaseModel):
     context: dict[str, Any] = Field(default_factory=dict)
 
     class Config:
+        """Pydantic configuration for TodoPlan model."""
+
         arbitrary_types_allowed = True
 
     @field_validator("user_request")
     @classmethod
     def user_request_must_not_be_empty(cls, v):
+        """Validate that user request is not empty."""
         if not v or not v.strip():
             raise ValueError("User request cannot be empty")
         return v.strip()
@@ -184,6 +197,7 @@ class TodoPlan(BaseModel):
     @field_validator("analysis")
     @classmethod
     def analysis_must_not_be_empty(cls, v):
+        """Validate that analysis is not empty."""
         if not v or not v.strip():
             raise ValueError("Analysis cannot be empty")
         return v.strip()
@@ -191,6 +205,7 @@ class TodoPlan(BaseModel):
     @field_validator("expected_outcome")
     @classmethod
     def expected_outcome_must_not_be_empty(cls, v):
+        """Validate that expected outcome is not empty."""
         if not v or not v.strip():
             raise ValueError("Expected outcome cannot be empty")
         return v.strip()
@@ -198,6 +213,7 @@ class TodoPlan(BaseModel):
     @field_validator("plan_version")
     @classmethod
     def plan_version_must_be_positive(cls, v):
+        """Validate that plan version is positive."""
         if v < 1:
             raise ValueError("Plan version must be positive")
         return v

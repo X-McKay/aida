@@ -21,6 +21,7 @@ class ThinkingTool(BaseModularTool[ThinkingRequest, ThinkingResponse, ThinkingCo
     """Tool for complex reasoning, analysis, and strategic planning using LLM."""
 
     def __init__(self):
+        """Initialize thinking tool with response cache and prompt/parser components."""
         super().__init__()
         self._response_cache = {}
 

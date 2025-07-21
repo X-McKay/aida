@@ -42,7 +42,7 @@ class ExecutionRequest(BaseModel):
     )
 
     @validator("memory_limit")
-    def validate_memory_limit(self, v):
+    def validate_memory_limit(cls, v):
         """Validate memory limit format."""
         import re
 

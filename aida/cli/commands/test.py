@@ -51,7 +51,6 @@ def run(
     ),
 ):
     """Run integration tests for refactored components."""
-
     if suite and suite not in test_registry.list_suites():
         console.print(f"[red]❌ Unknown test suite: {suite}[/red]")
         console.print("\nAvailable suites:")
@@ -111,8 +110,7 @@ def quick():
 
 @test_app.callback()
 def test_callback():
-    """
-    Integration testing for AIDA's refactored components.
+    """Integration testing for AIDA's refactored components.
 
     Tests the LLM system and Todo Orchestrator with real functionality
     to ensure refactoring hasn't broken core features.

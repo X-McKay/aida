@@ -12,6 +12,12 @@ class AIDATestRunner:
     """Main test runner for AIDA integration tests."""
 
     def __init__(self, verbose: bool = False, persist_files: bool = False):
+        """Initialize the test runner.
+
+        Args:
+            verbose: Whether to show detailed output
+            persist_files: Whether to keep test files after tests complete
+        """
         self.verbose = verbose
         self.persist_files = persist_files
         self.all_results: dict[str, list[TestResult]] = {}
@@ -105,8 +111,7 @@ class AIDATestRunner:
 async def run_tests(
     suite_name: str | None = None, verbose: bool = False, persist_files: bool = False
 ) -> bool:
-    """
-    Run AIDA integration tests.
+    """Run AIDA integration tests.
 
     Args:
         suite_name: Specific test suite to run (None for all)

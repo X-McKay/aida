@@ -38,9 +38,11 @@ def list():
                 table.add_row(
                     tool.name,
                     tool.version,
-                    tool.description[:80] + "..."
-                    if len(tool.description) > 80
-                    else tool.description,
+                    (
+                        tool.description[:80] + "..."
+                        if len(tool.description) > 80
+                        else tool.description
+                    ),
                     "Ready",
                 )
 
@@ -109,9 +111,9 @@ def info(tool_name: str):
 [bold]Version:[/bold] {tool.version}
 [bold]Description:[/bold] {tool.description}
 
-[bold]Supported Platforms:[/bold] {', '.join(capability.supported_platforms)}
-[bold]Required Permissions:[/bold] {', '.join(capability.required_permissions)}
-[bold]Dependencies:[/bold] {', '.join(capability.dependencies) if capability.dependencies else 'None'}"""
+[bold]Supported Platforms:[/bold] {", ".join(capability.supported_platforms)}
+[bold]Required Permissions:[/bold] {", ".join(capability.required_permissions)}
+[bold]Dependencies:[/bold] {", ".join(capability.dependencies) if capability.dependencies else "None"}"""
 
         console.print_panel(overview_content, title=f"Tool: {tool_name}", border_style="blue")
 
@@ -484,10 +486,10 @@ def validate(tool_name: str):
 [bold]Overall Status:[/bold] [{status_color}]{status_text}[/{status_color}]
 
 [bold]Checks:[/bold]
-• Capability Structure: {'✅' if validation_results['capability_check'] else '❌'}
-• Parameter Validation: {'✅' if validation_results['parameter_validation'] else '❌'}
-• Dependency Check: {'✅' if validation_results['dependency_check'] else '❌'}
-• Platform Compatibility: {'✅' if validation_results['platform_compatibility'] else '❌'}"""
+• Capability Structure: {"✅" if validation_results["capability_check"] else "❌"}
+• Parameter Validation: {"✅" if validation_results["parameter_validation"] else "❌"}
+• Dependency Check: {"✅" if validation_results["dependency_check"] else "❌"}
+• Platform Compatibility: {"✅" if validation_results["platform_compatibility"] else "❌"}"""
 
         console.print_panel(result_content, title="Validation Results", border_style=status_color)
 

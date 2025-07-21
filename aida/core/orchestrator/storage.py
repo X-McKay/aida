@@ -17,6 +17,7 @@ class PlanStorageManager:
     """Manages persistent storage and retrieval of TodoPlans."""
 
     def __init__(self, storage_dir: str = ".aida/plans"):
+        """Initialize plan storage manager with specified storage directory."""
         self.storage_dir = storage_dir
         self._ensure_storage_dir()
 
@@ -99,7 +100,7 @@ class PlanStorageManager:
             logger.error(f"Failed to delete plan {plan_id}: {e}")
             return False
 
-    def archive_completed_plans(self, archive_dir: str = None) -> int:
+    def archive_completed_plans(self, archive_dir: str | None = None) -> int:
         """Archive completed plans to a separate directory."""
         if archive_dir is None:
             archive_dir = os.path.join(self.storage_dir, "archived")
@@ -135,7 +136,7 @@ class PlanStorageManager:
 
         return deleted_count
 
-    def export_plan_summary(self, output_file: str = None) -> str:
+    def export_plan_summary(self, output_file: str | None = None) -> str:
         """Export a summary of all plans to a text file."""
         if output_file is None:
             timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")

@@ -27,8 +27,15 @@ class ToolError(Exception):
     """Base exception for tool errors."""
 
     def __init__(
-        self, message: str, error_code: str = "TOOL_ERROR", details: dict[str, Any] = None
+        self, message: str, error_code: str = "TOOL_ERROR", details: dict[str, Any] | None = None
     ):
+        """Initialize a tool error.
+
+        Args:
+            message: Error message
+            error_code: Specific error code for categorization
+            details: Additional error details as a dictionary
+        """
         super().__init__(message)
         self.message = message
         self.error_code = error_code
@@ -87,6 +94,13 @@ class Tool(ABC):
     """Abstract base class for all AIDA tools."""
 
     def __init__(self, name: str, description: str, version: str = "1.0.0"):
+        """Initialize a tool with its basic properties.
+
+        Args:
+            name: Tool name identifier
+            description: Human-readable tool description
+            version: Tool version string
+        """
         self.name = name
         self.description = description
         self.version = version
@@ -325,6 +339,7 @@ class ToolRegistry:
     """Registry for managing tools."""
 
     def __init__(self):
+        """Initialize an empty tool registry with thread-safe storage."""
         self._tools: dict[str, Tool] = {}
         self._capabilities: dict[str, ToolCapability] = {}
         self._lock = asyncio.Lock()
@@ -399,7 +414,10 @@ def get_tool_registry() -> ToolRegistry:
     global _global_tool_registry
     if _global_tool_registry is None:
         _global_tool_registry = ToolRegistry()
-    return _global_tool_registry
+    # Type narrowing with cast
+    from typing import cast
+
+    return cast(ToolRegistry, _global_tool_registry)
 
 
 async def initialize_default_tools() -> ToolRegistry:

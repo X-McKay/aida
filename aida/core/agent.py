@@ -48,6 +48,20 @@ class BaseAgent(ABC):
     """Abstract base class for all AIDA agents."""
 
     def __init__(self, config: AgentConfig):
+        """Initialize the base agent.
+
+        Args:
+            config: Agent configuration containing:
+                - agent_id: Optional unique identifier (auto-generated if not provided)
+                - name: Agent name for identification
+                - capabilities: List of agent capabilities
+                - protocols: Communication protocol configurations
+                - tools: List of tool names to load
+                - memory_config: Memory manager configuration
+                - security_config: Security settings
+                - max_concurrent_tasks: Maximum concurrent task limit
+                - heartbeat_interval: Interval for heartbeat in seconds
+        """
         self.config = config
         self.agent_id = config.agent_id or str(uuid.uuid4())
         self.name = config.name

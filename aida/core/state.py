@@ -1,6 +1,7 @@
 """State management for AIDA agents."""
 
 import asyncio
+from collections.abc import Callable
 from datetime import datetime
 from enum import Enum
 import json
@@ -96,6 +97,7 @@ class MemoryStateStore(StateStore):
     """In-memory state store implementation."""
 
     def __init__(self):
+        """Initialize in-memory state store with thread-safe access."""
         self._data: dict[str, Any] = {}
         self._lock = asyncio.Lock()
 
@@ -143,15 +145,25 @@ class RedisStateStore(StateStore):
     """Redis-based state store implementation."""
 
     def __init__(self, redis_url: str = "redis://localhost:6379"):
+        """Initialize Redis state store.
+
+        Args:
+            redis_url: Redis connection URL (default: redis://localhost:6379)
+        """
         self.redis_url = redis_url
         self._redis = None
 
     async def _get_redis(self):
         """Get Redis connection."""
         if self._redis is None:
-            import aioredis
+            try:
+                import redis.asyncio as redis  # type: ignore[import]
 
-            self._redis = await aioredis.from_url(self.redis_url)
+                self._redis = await redis.from_url(self.redis_url)
+            except ImportError:
+                raise ImportError(
+                    "Redis support requires 'redis' package. Install with: pip install redis"
+                )
         return self._redis
 
     async def get(self, key: str) -> Any | None:
@@ -196,13 +208,18 @@ class StateManager:
     """State manager for AIDA system."""
 
     def __init__(self, store: StateStore | None = None):
+        """Initialize state manager with specified store.
+
+        Args:
+            store: State store implementation (defaults to MemoryStateStore)
+        """
         self.store = store or MemoryStateStore()
         self._agent_states: dict[str, AgentState] = {}
         self._system_state: SystemState | None = None
         self._lock = asyncio.Lock()
 
         # Change tracking
-        self._change_subscribers: list[callable] = []
+        self._change_subscribers: list[Callable] = []
         self._last_updated: dict[str, datetime] = {}
 
     async def initialize_system(self, system_id: str) -> None:
@@ -265,8 +282,20 @@ class StateManager:
 
             # Try persistent store
             data = await self.store.get(f"agent:{agent_id}")
-            if data:
-                agent_state = AgentState(**data)
+            if data and isinstance(data, dict):
+                # Create with explicit agent_id to satisfy type checker
+                agent_state = AgentState(
+                    agent_id=data.get("agent_id", agent_id),
+                    status=data.get("status", AgentStatus.INITIALIZING),
+                    started_at=data.get("started_at"),
+                    last_heartbeat=data.get("last_heartbeat"),
+                    tasks_completed=data.get("tasks_completed", 0),
+                    tasks_failed=data.get("tasks_failed", 0),
+                    memory_usage=data.get("memory_usage", {}),
+                    error_count=data.get("error_count", 0),
+                    last_error=data.get("last_error"),
+                    metadata=data.get("metadata", {}),
+                )
                 self._agent_states[agent_id] = agent_state
                 return agent_state
 
@@ -282,8 +311,23 @@ class StateManager:
             keys = await self.store.keys("system:*")
             if keys:
                 data = await self.store.get(keys[0])
-                if data:
-                    self._system_state = SystemState(**data)
+                if data and isinstance(data, dict):
+                    # Extract system_id from key or use default
+                    system_id = (
+                        keys[0].replace("system:", "")
+                        if keys[0].startswith("system:")
+                        else "default"
+                    )
+                    # Create with explicit system_id to satisfy type checker
+                    self._system_state = SystemState(
+                        system_id=data.get("system_id", system_id),
+                        agents=data.get("agents", {}),
+                        started_at=data.get("started_at", datetime.utcnow()),
+                        total_tasks_completed=data.get("total_tasks_completed", 0),
+                        total_tasks_failed=data.get("total_tasks_failed", 0),
+                        active_connections=data.get("active_connections", 0),
+                        system_metrics=data.get("system_metrics", {}),
+                    )
                     return self._system_state
 
             return None
@@ -297,8 +341,20 @@ class StateManager:
                 agent_id = key.split(":", 1)[1]
                 if agent_id not in self._agent_states:
                     data = await self.store.get(key)
-                    if data:
-                        self._agent_states[agent_id] = AgentState(**data)
+                    if data and isinstance(data, dict):
+                        # Create with explicit agent_id to satisfy type checker
+                        self._agent_states[agent_id] = AgentState(
+                            agent_id=data.get("agent_id", agent_id),
+                            status=data.get("status", AgentStatus.INITIALIZING),
+                            started_at=data.get("started_at"),
+                            last_heartbeat=data.get("last_heartbeat"),
+                            tasks_completed=data.get("tasks_completed", 0),
+                            tasks_failed=data.get("tasks_failed", 0),
+                            memory_usage=data.get("memory_usage", {}),
+                            error_count=data.get("error_count", 0),
+                            last_error=data.get("last_error"),
+                            metadata=data.get("metadata", {}),
+                        )
 
             return list(self._agent_states.values())
 
@@ -361,11 +417,11 @@ class StateManager:
 
         return stats
 
-    def subscribe_to_changes(self, callback: callable) -> None:
+    def subscribe_to_changes(self, callback: Callable) -> None:
         """Subscribe to state changes."""
         self._change_subscribers.append(callback)
 
-    def unsubscribe_from_changes(self, callback: callable) -> None:
+    def unsubscribe_from_changes(self, callback: Callable) -> None:
         """Unsubscribe from state changes."""
         if callback in self._change_subscribers:
             self._change_subscribers.remove(callback)
@@ -391,4 +447,7 @@ def get_state_manager() -> StateManager:
     global _global_state_manager
     if _global_state_manager is None:
         _global_state_manager = StateManager()
-    return _global_state_manager
+    # Type narrowing with cast
+    from typing import cast
+
+    return cast(StateManager, _global_state_manager)

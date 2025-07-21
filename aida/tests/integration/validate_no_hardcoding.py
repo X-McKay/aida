@@ -33,12 +33,13 @@ def check_file_for_hardcoded_questions(filepath: Path) -> list:
             # Could be a hardcoded response mapping
             lines = content.split("\n")
             for i, line in enumerate(lines):
-                if f'"{question}"' in line and ":" in line:
-                    # Check surrounding lines for return/response
-                    if i + 1 < len(lines) and (
-                        "return" in lines[i + 1] or "response" in lines[i + 1]
-                    ):
-                        violations.append(f"Possible hardcoded response for: {question}")
+                if (
+                    f'"{question}"' in line
+                    and ":" in line
+                    and i + 1 < len(lines)
+                    and ("return" in lines[i + 1] or "response" in lines[i + 1])
+                ):
+                    violations.append(f"Possible hardcoded response for: {question}")
 
     # Check for test mode conditionals
     test_patterns = [

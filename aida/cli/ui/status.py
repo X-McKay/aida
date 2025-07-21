@@ -11,6 +11,12 @@ class StatusDisplay:
     """Display system status information."""
 
     def __init__(self, console: Console | None = None):
+        """Initialize the status display.
+
+        Args:
+            console: Optional Rich console instance for output.
+                If not provided, creates a new Console instance.
+        """
         self.console = console or Console()
 
     def show_system_status(self, status_data: dict[str, Any]) -> None:
@@ -168,7 +174,7 @@ class StatusDisplay:
 
 Health Checks: {checks_passed}/{total_checks} passed
 
-Last Check: {health_data.get('last_check', 'Never')}
+Last Check: {health_data.get("last_check", "Never")}
 """
 
         self.console.print(

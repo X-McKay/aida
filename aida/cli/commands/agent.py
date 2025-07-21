@@ -1,6 +1,5 @@
 """Agent management commands for AIDA CLI."""
 
-
 from rich.table import Table
 import typer
 

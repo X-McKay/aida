@@ -11,6 +11,7 @@ class ContextObservability:
     """OpenTelemetry observability for context operations."""
 
     def __init__(self, context_tool, config: dict[str, Any]):
+        """Initialize context observability with tool instance and configuration."""
         self.context_tool = context_tool
         self.config = config
         self.enabled = config.get("trace_enabled", True)
@@ -24,9 +25,6 @@ class ContextObservability:
         """Setup OpenTelemetry components."""
         try:
             from opentelemetry import metrics, trace
-            from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-            from opentelemetry.sdk.trace import TracerProvider
-            from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
             # Setup tracer
             self.tracer = trace.get_tracer(self.config.get("service_name", "aida-context-tool"))
@@ -96,7 +94,7 @@ class ContextObservability:
         operation: str,
         processing_time: float,
         content_size: int,
-        compression_ratio: float = None,
+        compression_ratio: float | None = None,
     ):
         """Record metrics for an operation."""
         if not self.enabled:

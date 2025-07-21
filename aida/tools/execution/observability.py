@@ -12,6 +12,12 @@ class ExecutionObservability(SimpleObservability):
     """OpenTelemetry observability for execution operations."""
 
     def __init__(self, execution_tool, config: dict[str, Any]):
+        """Initialize execution observability with custom metrics.
+
+        Args:
+            execution_tool: The execution tool instance to observe
+            config: Configuration for observability settings
+        """
         custom_metrics = {
             "executions_total": {
                 "type": "counter",
@@ -61,7 +67,9 @@ class ExecutionObservability(SimpleObservability):
             language_usage=1,
         )
 
-        if not success:
-            # Record timeout if applicable
-            if hasattr(self, "custom_metrics") and "execution_timeouts" in self.custom_metrics:
-                self.custom_metrics["execution_timeouts"].add(1, {"language": language})
+        if (
+            not success
+            and hasattr(self, "custom_metrics")
+            and "execution_timeouts" in self.custom_metrics
+        ):
+            self.custom_metrics["execution_timeouts"].add(1, {"language": language})

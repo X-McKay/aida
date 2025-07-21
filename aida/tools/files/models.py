@@ -66,7 +66,7 @@ class FileOperationRequest(BaseModel):
     batch_operations: list[dict[str, Any]] | None = Field(None, description="Batch operations")
 
     @validator("path")
-    def validate_path(self, v):
+    def validate_path(cls, v):
         """Validate and normalize path."""
         if not v:
             raise ValueError("Path cannot be empty")
@@ -74,7 +74,7 @@ class FileOperationRequest(BaseModel):
         return str(Path(v).expanduser())
 
     @validator("destination")
-    def validate_destination(self, v, values):
+    def validate_destination(cls, v, values):
         """Validate destination for copy/move operations."""
         if values.get("operation") in [FileOperation.COPY, FileOperation.MOVE] and not v:
             raise ValueError(f"Destination required for {values['operation']} operation")
@@ -96,4 +96,6 @@ class FileOperationResponse(BaseModel):
     details: dict[str, Any] = Field(default_factory=dict)
 
     class Config:
+        """Pydantic configuration for FileOperationResponse."""
+
         arbitrary_types_allowed = True

@@ -12,6 +12,7 @@ class LLMResponseObservability(SimpleObservability):
     """OpenTelemetry observability for LLM response operations."""
 
     def __init__(self, llm_response_tool, config: dict[str, Any]):
+        """Initialize LLM response observability with custom metrics."""
         custom_metrics = {
             "response_count": {
                 "type": "counter",

@@ -1,6 +1,7 @@
 """Base MCP server implementation for AIDA tools."""
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 import json
 import logging
 from typing import Any
@@ -51,7 +52,7 @@ class BaseMCPServer(ABC):
         pass
 
     @abstractmethod
-    def _get_tool_handler(self, name: str) -> callable | None:
+    def _get_tool_handler(self, name: str) -> Callable | None:
         """Get handler for specific tool name."""
         pass
 
@@ -74,7 +75,11 @@ class BaseMCPServer(ABC):
         return {"content": [{"type": "text", "text": error_message}], "isError": True}
 
     def _create_tool_schema(
-        self, name: str, description: str, properties: dict[str, Any], required: list[str] = None
+        self,
+        name: str,
+        description: str,
+        properties: dict[str, Any],
+        required: list[str] | None = None,
     ) -> dict[str, Any]:
         """Helper to create consistent tool schemas."""
         return {
@@ -119,7 +124,7 @@ class SimpleMCPServer(BaseMCPServer):
 
         return tools
 
-    def _get_tool_handler(self, name: str) -> callable | None:
+    def _get_tool_handler(self, name: str) -> Callable | None:
         """Get handler for specific tool name."""
         # Extract operation from tool name
         prefix = f"{self.tool.name}_"

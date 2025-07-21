@@ -327,8 +327,7 @@ def main_callback(
     config_file: Path | None = typer.Option(None, "--config", "-c", help="Configuration file path"),
     log_level: str = typer.Option("INFO", help="Log level (DEBUG, INFO, WARNING, ERROR)"),
 ):
-    """
-    Advanced Intelligent Distributed Agent System (AIDA)
+    """Advanced Intelligent Distributed Agent System (AIDA).
 
     A comprehensive agentic system for complex multi-agent coordination and task execution.
     """

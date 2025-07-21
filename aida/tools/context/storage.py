@@ -15,6 +15,11 @@ class SnapshotManager:
     """Manages context snapshots."""
 
     def __init__(self, storage_dir: str):
+        """Initialize the snapshot manager with a storage directory.
+
+        Args:
+            storage_dir: Directory path where snapshots will be stored.
+        """
         self.storage_dir = Path(storage_dir)
         self.storage_dir.mkdir(parents=True, exist_ok=True)
 
@@ -60,7 +65,10 @@ class SnapshotManager:
 
         try:
             snapshot_data = json.loads(snapshot_path.read_text())
-            return ContextSnapshot(**snapshot_data)
+            # Ensure content field exists
+            if "content" not in snapshot_data:
+                snapshot_data["content"] = {}
+            return ContextSnapshot(**snapshot_data)  # ty: ignore[missing-argument]
         except Exception as e:
             logger.error(f"Failed to load snapshot {snapshot_id}: {e}")
             return None
@@ -72,7 +80,10 @@ class SnapshotManager:
         for snapshot_file in self.storage_dir.glob("*.json"):
             try:
                 snapshot_data = json.loads(snapshot_file.read_text())
-                snapshots.append(ContextSnapshot(**snapshot_data))
+                # Ensure content field exists
+                if "content" not in snapshot_data:
+                    snapshot_data["content"] = {}
+                snapshots.append(ContextSnapshot(**snapshot_data))  # ty: ignore[missing-argument]
             except Exception as e:
                 logger.warning(f"Failed to load snapshot from {snapshot_file}: {e}")
 

@@ -86,7 +86,7 @@ class SystemRequest(BaseModel):
     interpreter: str | None = Field(None, description="Script interpreter")
 
     @validator("command")
-    def validate_command(self, v, values):
+    def validate_command(cls, v, values):
         """Validate command for execute operations."""
         op = values.get("operation")
         if op in [SystemOperation.EXECUTE, SystemOperation.SHELL] and not v:
@@ -94,7 +94,7 @@ class SystemRequest(BaseModel):
         return v
 
     @validator("pid")
-    def validate_pid(self, v, values):
+    def validate_pid(cls, v, values):
         """Validate PID for process operations."""
         op = values.get("operation")
         if op in [SystemOperation.PROCESS_INFO, SystemOperation.PROCESS_KILL] and not v:
@@ -108,9 +108,9 @@ class SystemResponse(BaseModel):
     request_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     operation: SystemOperation
     success: bool
-    result: CommandResult | list[ProcessInfo] | ProcessInfo | SystemInfo | str | dict[
-        str, str
-    ] | None = None
+    result: (
+        CommandResult | list[ProcessInfo] | ProcessInfo | SystemInfo | str | dict[str, str] | None
+    ) = None
     error: str | None = None
     warnings: list[str] = Field(default_factory=list)
     execution_time: float = 0.0

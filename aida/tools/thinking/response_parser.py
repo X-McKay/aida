@@ -189,11 +189,7 @@ class ThinkingResponseParser:
                     if summary_lines:
                         return " ".join(summary_lines)
 
-        # If no explicit summary, try to extract from sections
-        if hasattr(response, "sections") and response.sections:
-            for section_key in ["summary", "conclusion", "recommendations"]:
-                if section_key in response.sections:
-                    return response.sections[section_key].content
+        # If no explicit summary found in text, continue to fallback
 
         # Fallback: Use first substantial paragraph
         for line in lines:

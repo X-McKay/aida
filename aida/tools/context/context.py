@@ -5,8 +5,9 @@ from datetime import datetime
 import json
 import logging
 from typing import Any
+import uuid
 
-from aida.tools.base import Tool, ToolCapability, ToolParameter, ToolResult
+from aida.tools.base import Tool, ToolCapability, ToolParameter, ToolResult, ToolStatus
 
 from .config import ContextConfig
 from .models import (
@@ -28,6 +29,15 @@ class ContextTool(Tool):
     """Tool for managing and processing context in conversations and workflows."""
 
     def __init__(self):
+        """Initialize the context tool.
+
+        Sets up the tool with context processing capabilities including:
+        - Context compression and summarization
+        - Key point extraction
+        - Search functionality
+        - Snapshot management for persistence
+        - Support for multiple output formats
+        """
         super().__init__(
             name="context",
             description="Manages conversation context with compression, summarization, and search capabilities",
@@ -119,6 +129,18 @@ class ContextTool(Tool):
         start_time = datetime.utcnow()
 
         try:
+            # Ensure operation is provided
+            if "operation" not in kwargs:
+                return ToolResult(
+                    tool_name=self.name,
+                    execution_id=str(uuid.uuid4()),
+                    status=ToolStatus.FAILED,
+                    error="Missing required parameter: operation",
+                    started_at=start_time,
+                    completed_at=datetime.utcnow(),
+                    metadata={"error_type": "validation_error"},
+                )
+
             # Handle compression_level conversion
             if "compression_level" in kwargs:
                 level = kwargs["compression_level"]
@@ -148,7 +170,7 @@ class ContextTool(Tool):
                         kwargs["compression_level"] = CompressionLevel.EXTREME
 
             # Create request model
-            request = ContextRequest(**kwargs)
+            request = ContextRequest(**kwargs)  # ty: ignore[missing-argument]
 
             # Route to appropriate operation
             if request.operation == ContextOperation.COMPRESS:
@@ -189,7 +211,7 @@ class ContextTool(Tool):
             return ToolResult(
                 tool_name=self.name,
                 execution_id="",
-                status="failed",
+                status=ToolStatus.FAILED,
                 error=str(e),
                 started_at=start_time,
                 completed_at=datetime.utcnow(),
@@ -266,7 +288,19 @@ class ContextTool(Tool):
         )
 
         # Convert to response models
-        results = [ContextSearchResult(**result) for result in search_results["results"]]
+        results = []
+        for result in search_results["results"]:
+            if isinstance(result, dict):
+                results.append(
+                    ContextSearchResult(
+                        content=result.get("content", ""),
+                        relevance_score=result.get("relevance_score", 0.0),
+                        location=result.get("location"),
+                        context_before=result.get("context_before"),
+                        context_after=result.get("context_after"),
+                        metadata=result.get("metadata", {}),
+                    )
+                )
 
         return ContextResponse(
             operation=request.operation,
@@ -331,9 +365,9 @@ class ContextTool(Tool):
                 "original_size": response.original_length or 0,
                 "compressed_size": response.compressed_length or 0,
                 "ratio": response.compression_ratio or 1.0,
-                "efficiency": 1.0 - (response.compression_ratio or 1.0)
-                if response.compression_ratio
-                else 0,
+                "efficiency": (
+                    1.0 - (response.compression_ratio or 1.0) if response.compression_ratio else 0
+                ),
                 "actual_ratio": response.compression_ratio or 1.0,
             }
 
@@ -407,7 +441,7 @@ class ContextTool(Tool):
         return ToolResult(
             tool_name=self.name,
             execution_id=response.request_id,
-            status="completed",
+            status=ToolStatus.COMPLETED,
             result=result,
             started_at=start_time,
             completed_at=datetime.utcnow(),

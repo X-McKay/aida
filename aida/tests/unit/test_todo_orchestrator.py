@@ -82,8 +82,9 @@ def mock_chat_response():
 @pytest.fixture
 def orchestrator(mock_tool_registry, mock_chat_response):
     """Create orchestrator with mocked dependencies."""
-    with patch("aida.tools.base.get_tool_registry", return_value=mock_tool_registry), patch(
-        "aida.llm.chat", new_callable=AsyncMock, return_value=mock_chat_response
+    with (
+        patch("aida.tools.base.get_tool_registry", return_value=mock_tool_registry),
+        patch("aida.llm.chat", new_callable=AsyncMock, return_value=mock_chat_response),
     ):
         orch = TodoOrchestrator()
         orch._tools_initialized = True  # Skip initialization

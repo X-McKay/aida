@@ -10,6 +10,7 @@ class ProgressTracker:
     """Progress tracker for long-running operations."""
 
     def __init__(self, console: Console | None = None):
+        """Initialize progress tracker with optional console and task storage."""
         self.console = console or Console()
         self.progress: Progress | None = None
         self.tasks: dict[str, TaskID] = {}
@@ -84,6 +85,7 @@ class SimpleProgress:
     """Simple progress indicator for basic operations."""
 
     def __init__(self, console: Console | None = None):
+        """Initialize simple progress indicator with optional console."""
         self.console = console or Console()
         self.start_time = None
 

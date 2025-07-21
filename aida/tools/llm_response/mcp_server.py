@@ -12,6 +12,7 @@ class LLMResponseMCPServer(SimpleMCPServer):
     """MCP server wrapper for LLMResponseTool."""
 
     def __init__(self, llm_response_tool):
+        """Initialize MCP server with LLM response tool and operation definitions."""
         operations = {
             "answer": {
                 "description": "Get a direct response from the LLM",

@@ -88,7 +88,8 @@ class ContextRequest(BaseModel):
     preserve_priority: str | None = Field("balanced", description="Priority for merge operations")
 
     @validator("content")
-    def validate_content(self, v, values):
+    def validate_content(cls, v, values):
+        """Validate content based on operation type."""
         operation = values.get("operation")
         if operation == ContextOperation.RESTORE:
             # Restore doesn't need content

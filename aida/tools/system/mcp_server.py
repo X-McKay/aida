@@ -12,6 +12,11 @@ class SystemMCPServer(SimpleMCPServer):
     """MCP server wrapper for SystemTool."""
 
     def __init__(self, system_tool):
+        """Initialize the SystemMCPServer with the system tool.
+
+        Args:
+            system_tool: Instance of SystemTool to wrap with MCP protocol
+        """
         operations = {
             "execute": {
                 "description": "Execute a system command",

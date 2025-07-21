@@ -56,7 +56,18 @@ class ThinkingRequest(BaseModel):
     )
 
     @validator("problem")
-    def problem_not_empty(self, v):
+    def problem_not_empty(cls, v):
+        """Validate that problem statement is not empty.
+
+        Args:
+            v: Problem value to validate
+
+        Returns:
+            Stripped problem string
+
+        Raises:
+            ValueError: If problem statement is empty
+        """
         if not v or not v.strip():
             raise ValueError("Problem statement cannot be empty")
         return v.strip()

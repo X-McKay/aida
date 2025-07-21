@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Tests for TODO orchestrator plan complexity scaling.
 
@@ -13,7 +12,7 @@ import sys
 import time
 from unittest.mock import Mock
 
-import pytest
+import pytest  # type: ignore[import-not-found]
 
 # Add AIDA to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -25,7 +24,7 @@ from aida.tools.base import ToolCapability, ToolParameter, ToolResult, ToolStatu
 class MockTool:
     """Mock tool for testing."""
 
-    def __init__(self, name: str, description: str, parameters: list = None):
+    def __init__(self, name: str, description: str, parameters: list | None = None):
         self.name = name
         self.description = description
         self.parameters = parameters or []
@@ -294,9 +293,9 @@ async def test_simple_request_generates_simple_plan(orchestrator):
         "pipeline",
     ]
 
-    assert not any(
-        keyword in plan_text for keyword in complex_keywords
-    ), "Simple plan should not contain complex architecture keywords"
+    assert not any(keyword in plan_text for keyword in complex_keywords), (
+        "Simple plan should not contain complex architecture keywords"
+    )
 
 
 @pytest.mark.asyncio
@@ -320,9 +319,9 @@ async def test_complex_request_generates_complex_plan(orchestrator):
         "pipeline",
     ]
 
-    assert any(
-        keyword in plan_text for keyword in complex_keywords
-    ), "Complex plan should contain complex architecture keywords"
+    assert any(keyword in plan_text for keyword in complex_keywords), (
+        "Complex plan should contain complex architecture keywords"
+    )
 
 
 @pytest.mark.asyncio
@@ -337,9 +336,9 @@ async def test_plan_complexity_scaling(orchestrator):
     complex_plan = await orchestrator.create_plan(complex_request)
 
     # Verify complexity scaling
-    assert (
-        len(simple_plan.steps) < len(complex_plan.steps)
-    ), f"Simple plan ({len(simple_plan.steps)} steps) should have fewer steps than complex plan ({len(complex_plan.steps)} steps)"
+    assert len(simple_plan.steps) < len(complex_plan.steps), (
+        f"Simple plan ({len(simple_plan.steps)} steps) should have fewer steps than complex plan ({len(complex_plan.steps)} steps)"
+    )
 
 
 @pytest.mark.asyncio
@@ -366,9 +365,9 @@ async def test_execution_time_scaling(orchestrator):
     assert complex_result["status"] == "completed"
 
     # Complex should take similar or longer time (allowing for some variance due to mocking)
-    assert (
-        complex_duration >= simple_duration * 0.5
-    ), f"Complex execution ({complex_duration:.2f}s) should take similar or longer time than simple ({simple_duration:.2f}s)"
+    assert complex_duration >= simple_duration * 0.5, (
+        f"Complex execution ({complex_duration:.2f}s) should take similar or longer time than simple ({simple_duration:.2f}s)"
+    )
 
 
 @pytest.mark.asyncio

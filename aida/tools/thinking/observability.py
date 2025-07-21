@@ -12,6 +12,12 @@ class ThinkingObservability(SimpleObservability):
     """OpenTelemetry observability for thinking operations."""
 
     def __init__(self, thinking_tool, config: dict[str, Any]):
+        """Initialize observability for thinking tool with custom metrics.
+
+        Args:
+            thinking_tool: The thinking tool instance to monitor
+            config: Configuration dictionary for observability settings
+        """
         custom_metrics = {
             "analysis_count": {
                 "type": "counter",

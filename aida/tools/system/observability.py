@@ -12,6 +12,12 @@ class SystemObservability(SimpleObservability):
     """OpenTelemetry observability for system operations."""
 
     def __init__(self, system_tool, config: dict[str, Any]):
+        """Initialize observability for system tool with custom metrics.
+
+        Args:
+            system_tool: The system tool instance to monitor
+            config: Configuration dictionary for observability settings
+        """
         custom_metrics = {
             "commands_executed": {
                 "type": "counter",

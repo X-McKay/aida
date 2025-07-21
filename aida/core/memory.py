@@ -43,15 +43,9 @@ class MemoryEntry:
     created_at: datetime
     accessed_at: datetime
     access_count: int = 0
-    tags: set[str] = None
-    metadata: dict[str, Any] = None
+    tags: set[str] = Field(default_factory=set)
+    metadata: dict[str, Any] = Field(default_factory=dict)
     expires_at: datetime | None = None
-
-    def __post_init__(self):
-        if self.tags is None:
-            self.tags = set()
-        if self.metadata is None:
-            self.metadata = {}
 
 
 class Context(BaseModel):
@@ -112,9 +106,9 @@ class MemoryStore:
 
     async def search(
         self,
-        query: str = None,
-        memory_type: MemoryType = None,
-        tags: set[str] = None,
+        query: str | None = None,
+        memory_type: MemoryType | None = None,
+        tags: set[str] | None = None,
         limit: int = 10,
     ) -> list[MemoryEntry]:
         """Search memory entries."""
@@ -137,6 +131,11 @@ class InMemoryStore(MemoryStore):
     """In-memory implementation of memory store."""
 
     def __init__(self, max_entries: int = 10000):
+        """Initialize in-memory store with size limit.
+
+        Args:
+            max_entries: Maximum number of entries to store (default: 10000)
+        """
         self.max_entries = max_entries
         self._entries: dict[str, MemoryEntry] = {}
         self._lock = asyncio.Lock()
@@ -161,9 +160,9 @@ class InMemoryStore(MemoryStore):
 
     async def search(
         self,
-        query: str = None,
-        memory_type: MemoryType = None,
-        tags: set[str] = None,
+        query: str | None = None,
+        memory_type: MemoryType | None = None,
+        tags: set[str] | None = None,
         limit: int = 10,
     ) -> list[MemoryEntry]:
         """Search memory entries."""
@@ -258,7 +257,16 @@ class InMemoryStore(MemoryStore):
 class MemoryManager:
     """Memory manager for AIDA agents."""
 
-    def __init__(self, config: dict[str, Any] = None):
+    def __init__(self, config: dict[str, Any] | None = None):
+        """Initialize the memory manager.
+
+        Args:
+            config: Optional configuration dictionary with the following keys:
+                - store_type: Type of memory store ('memory' for in-memory, default: 'memory')
+                - max_entries: Maximum number of memory entries to store (default: 10000)
+                - cleanup_interval_minutes: Interval for cleanup task in minutes (default: 30)
+                - default_context_ttl_hours: Default TTL for contexts in hours (default: 24)
+        """
         self.config = config or {}
 
         # Memory store
@@ -311,8 +319,8 @@ class MemoryManager:
         content: Any,
         memory_type: MemoryType = MemoryType.WORKING,
         priority: Priority = Priority.MEDIUM,
-        tags: set[str] = None,
-        metadata: dict[str, Any] = None,
+        tags: set[str] | None = None,
+        metadata: dict[str, Any] | None = None,
         ttl: timedelta | None = None,
     ) -> str:
         """Store a memory entry."""
@@ -348,9 +356,9 @@ class MemoryManager:
 
     async def search_memories(
         self,
-        query: str = None,
-        memory_type: MemoryType = None,
-        tags: set[str] = None,
+        query: str | None = None,
+        memory_type: MemoryType | None = None,
+        tags: set[str] | None = None,
         limit: int = 10,
     ) -> list[MemoryEntry]:
         """Search memory entries."""

@@ -1,6 +1,6 @@
 """Base MCP provider implementation for AIDA."""
 
-from abc import ABC
+from abc import ABC, abstractmethod
 import asyncio
 from datetime import datetime
 import logging
@@ -26,22 +26,22 @@ class MCPProvider(ABC):
     """Base class for Model Context Protocol providers."""
 
     def __init__(self, provider_name: str, config: dict[str, Any]):
+        """Initialize MCP provider.
+
+        Args:
+            provider_name: Name of the provider for identification.
+            config: Configuration dictionary for the provider.
+        """
         self.provider_name = provider_name
         self.config = config
         self._connected = False
         self._transport = None
         self._message_id = 0
 
+    @abstractmethod
     async def connect(self) -> bool:
         """Connect to MCP server."""
-        try:
-            # Implementation would establish connection
-            self._connected = True
-            logger.info(f"MCP provider {self.provider_name} connected")
-            return True
-        except Exception as e:
-            logger.error(f"Failed to connect MCP provider {self.provider_name}: {e}")
-            return False
+        pass
 
     async def disconnect(self) -> None:
         """Disconnect from MCP server."""
@@ -68,7 +68,7 @@ class MCPProvider(ABC):
             id=message.id, result={"status": "success", "data": f"Response to {method}"}
         )
 
-    async def initialize(self) -> dict[str, Any]:
+    async def initialize_session(self) -> dict[str, Any]:
         """Initialize MCP session."""
         response = await self.send_message(
             "initialize",

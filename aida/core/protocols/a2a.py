@@ -6,8 +6,7 @@ import logging
 from typing import Any
 
 import websockets
-from websockets.client import WebSocketClientProtocol
-from websockets.server import WebSocketServerProtocol
+from websockets import WebSocketClientProtocol, WebSocketServerProtocol  # type: ignore[import]
 
 from aida.core.protocols.base import Protocol, ProtocolMessage
 
@@ -58,6 +57,14 @@ class A2AProtocol(Protocol):
         port: int = 8080,
         discovery_enabled: bool = True,
     ):
+        """Initialize the A2A protocol.
+
+        Args:
+            agent_id: Unique identifier for this agent
+            host: Host address to bind the WebSocket server to
+            port: Port number to bind the WebSocket server to
+            discovery_enabled: Whether to enable automatic agent discovery
+        """
         super().__init__(agent_id)
         self.host = host
         self.port = port
@@ -130,7 +137,27 @@ class A2AProtocol(Protocol):
     async def send(self, message: ProtocolMessage) -> bool:
         """Send a message to another agent."""
         if not isinstance(message, A2AMessage):
-            message = A2AMessage(**message.dict())
+            # Convert to A2AMessage, preserving all fields
+            msg_dict = message.dict()
+            # Ensure required fields are present
+            if "sender_id" not in msg_dict:
+                msg_dict["sender_id"] = self.agent_id
+            if "message_type" not in msg_dict:
+                msg_dict["message_type"] = "unknown"
+            # Create with explicit fields to satisfy type checker
+            message = A2AMessage(
+                sender_id=msg_dict.get("sender_id", self.agent_id),
+                message_type=msg_dict.get("message_type", "unknown"),
+                id=msg_dict.get("id", msg_dict.get("id")),  # type: ignore
+                timestamp=msg_dict.get("timestamp", msg_dict.get("timestamp")),  # type: ignore
+                recipient_id=msg_dict.get("recipient_id"),
+                payload=msg_dict.get("payload", {}),
+                metadata=msg_dict.get("metadata", {}),
+                priority=msg_dict.get("priority", 5),
+                requires_ack=msg_dict.get("requires_ack", False),
+                correlation_id=msg_dict.get("correlation_id"),
+                routing_path=msg_dict.get("routing_path", []),
+            )
 
         try:
             await self._outgoing_queue.put(message)

@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 import shutil
 from typing import Any
+import uuid
 
 from aida.tools.base import ToolCapability, ToolParameter, ToolResult, ToolStatus
 from aida.tools.base_tool import BaseModularTool
@@ -21,6 +22,7 @@ class FileOperationsTool(BaseModularTool[FileOperationRequest, FileOperationResp
     """Tool for comprehensive file and directory operations."""
 
     def __init__(self):
+        """Initialize the FileOperationsTool."""
         super().__init__()
 
     def _get_tool_name(self) -> str:
@@ -101,8 +103,20 @@ class FileOperationsTool(BaseModularTool[FileOperationRequest, FileOperationResp
         start_time = datetime.utcnow()
 
         try:
+            # Ensure operation is provided
+            if "operation" not in kwargs:
+                return ToolResult(
+                    tool_name=self.name,
+                    execution_id=str(uuid.uuid4()),
+                    status=ToolStatus.FAILED,
+                    error="Missing required parameter: operation",
+                    started_at=start_time,
+                    completed_at=datetime.utcnow(),
+                    metadata={"error_type": "validation_error"},
+                )
+
             # Create request model
-            request = FileOperationRequest(**kwargs)
+            request = FileOperationRequest(**kwargs)  # ty: ignore[missing-argument]
 
             # Check path safety
             if not FilesConfig.is_safe_path(request.path):
@@ -555,8 +569,19 @@ class FileOperationsTool(BaseModularTool[FileOperationRequest, FileOperationResp
 
         for op_data in request.batch_operations:
             try:
+                # Ensure operation is provided for batch item
+                if "operation" not in op_data:
+                    results.append(
+                        {
+                            "operation": "unknown",
+                            "success": False,
+                            "error": "Missing operation in batch item",
+                        }
+                    )
+                    continue
+
                 # Create request for individual operation
-                op_request = FileOperationRequest(**op_data)
+                op_request = FileOperationRequest(**op_data)  # ty: ignore[missing-argument]
                 response = await self._route_operation(op_request)
 
                 results.append(

@@ -152,15 +152,16 @@ class OrchestratorTestSuite(BaseTestSuite):
             }
 
     async def test_plan_execution_with_mocks(self) -> dict[str, Any]:
-        """Test orchestrator plan execution with mock tools."""
-        self.log("Testing plan execution with mocks")
+        """Test orchestrator plan execution."""
+        self.log("Testing plan execution")
 
         try:
-            # Import the demo orchestrator with mock tools
-            from examples.todo_orchestrator.demo import DemoOrchestrator
+            # Use the LoggingOrchestrator for testing
+            temp_dir = self.create_test_directory("plan_execution")
+            orchestrator = LoggingOrchestrator(storage_dir=temp_dir)
 
-            orchestrator = DemoOrchestrator()
-            simple_request = "Test execution"
+            # Create a simple request that will use llm_response tool
+            simple_request = "What is 2+2?"
 
             plan = await orchestrator.create_plan(simple_request)
 
@@ -283,9 +284,9 @@ class OrchestratorTestSuite(BaseTestSuite):
         if not interactions:
             return
 
-        print(f"\n{'='*80}")
+        print(f"\n{'=' * 80}")
         print("LLM INTERACTION SUMMARY")
-        print(f"{'='*80}")
+        print(f"{'=' * 80}")
         print(f"Total interactions: {len(interactions)}")
 
         successful = [i for i in interactions if "error" not in i]
@@ -297,7 +298,7 @@ class OrchestratorTestSuite(BaseTestSuite):
         if failed:
             print("\nFAILED INTERACTIONS:")
             for i, interaction in enumerate(failed):
-                print(f"\n{i+1}. Request: {interaction['user_request']}")
+                print(f"\n{i + 1}. Request: {interaction['user_request']}")
                 print(f"   Error: {interaction['error']}")
                 response_preview = (
                     interaction["response"][:100] + "..."
@@ -306,7 +307,7 @@ class OrchestratorTestSuite(BaseTestSuite):
                 )
                 print(f"   Response preview: {response_preview}")
 
-        print(f"{'='*80}\n")
+        print(f"{'=' * 80}\n")
 
     def create_test_directory(self, test_name: str) -> str:
         """Create a test directory within .aida/tests."""

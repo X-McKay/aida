@@ -1,6 +1,7 @@
 """Base protocol interface for AIDA communication."""
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from datetime import datetime
 from typing import Any, TypeVar
 import uuid
@@ -33,9 +34,15 @@ class Protocol(ABC):
     """Abstract base class for communication protocols."""
 
     def __init__(self, agent_id: str):
+        """Initialize the protocol with an agent ID.
+
+        Args:
+            agent_id: Unique identifier for the agent using this protocol.
+                Used as the sender_id when creating messages.
+        """
         self.agent_id = agent_id
-        self._handlers: dict[str, callable] = {}
-        self._middleware: list = []
+        self._handlers: dict[str, Callable] = {}
+        self._middleware: list[Callable] = []
 
     @abstractmethod
     async def send(self, message: ProtocolMessage) -> bool:
@@ -57,11 +64,11 @@ class Protocol(ABC):
         """Close connection for this protocol."""
         pass
 
-    def register_handler(self, message_type: str, handler: callable) -> None:
+    def register_handler(self, message_type: str, handler: Callable) -> None:
         """Register a message handler for a specific message type."""
         self._handlers[message_type] = handler
 
-    def add_middleware(self, middleware: callable) -> None:
+    def add_middleware(self, middleware: Callable) -> None:
         """Add middleware for message processing."""
         self._middleware.append(middleware)
 

@@ -12,6 +12,7 @@ class FilesObservability(SimpleObservability):
     """OpenTelemetry observability for file operations."""
 
     def __init__(self, files_tool, config: dict[str, Any]):
+        """Initialize file operations observability with custom metrics."""
         custom_metrics = {
             "file_operations_total": {
                 "type": "counter",

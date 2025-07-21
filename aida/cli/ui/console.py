@@ -34,6 +34,11 @@ class Console:
     """Enhanced console for AIDA CLI."""
 
     def __init__(self):
+        """Initialize the enhanced console with AIDA theme and syntax highlighting.
+
+        Creates a Rich console instance configured with AIDA's custom theme
+        and repr highlighting for improved output formatting.
+        """
         self.console = RichConsole(theme=aida_theme, highlighter=ReprHighlighter())
 
     def print(self, *args, **kwargs):
@@ -169,7 +174,7 @@ class Console:
         """Print a horizontal rule."""
         from rich.rule import Rule
 
-        self.console.print(Rule(title, style=style))
+        self.console.print(Rule(title or "", style=style))
 
     def progress(self):
         """Create a progress context manager."""

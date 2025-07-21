@@ -21,6 +21,13 @@ class BaseTestSuite:
     """Base class for test suites."""
 
     def __init__(self, name: str, verbose: bool = False, persist_files: bool = False):
+        """Initialize the base test suite.
+
+        Args:
+            name: Name of the test suite
+            verbose: Whether to print verbose output during test execution
+            persist_files: Whether to keep temporary test files after completion
+        """
         self.name = name
         self.verbose = verbose
         self.persist_files = persist_files
@@ -92,7 +99,7 @@ class BaseTestSuite:
         passed = len([r for r in self.results if r.success])
         total = len(self.results)
 
-        print(f"Passed: {passed}/{total} ({passed/total*100:.1f}%)")
+        print(f"Passed: {passed}/{total} ({passed / total * 100:.1f}%)")
         print(f"Total time: {sum(r.duration for r in self.results):.2f}s")
 
         failed_tests = [r for r in self.results if not r.success]
@@ -106,6 +113,7 @@ class TestRegistry:
     """Registry for test suites."""
 
     def __init__(self):
+        """Initialize the test registry with an empty suite dictionary."""
         self._suites: dict[str, BaseTestSuite] = {}
 
     def register(self, name: str, suite_class: type):

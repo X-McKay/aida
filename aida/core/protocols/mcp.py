@@ -109,6 +109,13 @@ class MCPProtocol(Protocol):
         transport: str = "stdio",
         capabilities: list[MCPCapability] | None = None,
     ):
+        """Initialize the MCP protocol.
+
+        Args:
+            agent_id: Unique identifier for this agent
+            transport: Transport mechanism for MCP communication (currently only "stdio" supported)
+            capabilities: List of MCP capabilities this agent supports
+        """
         super().__init__(agent_id)
         self.transport = transport
         self.capabilities = capabilities or []
@@ -168,7 +175,23 @@ class MCPProtocol(Protocol):
     async def send(self, message: ProtocolMessage) -> bool:
         """Send MCP message."""
         if not isinstance(message, MCPMessage):
-            message = MCPMessage(**message.dict())
+            # Convert to MCPMessage, preserving all fields
+            msg_dict = message.dict()
+            # Create with explicit fields to satisfy type checker
+            message = MCPMessage(
+                sender_id=msg_dict.get("sender_id", self.agent_id),
+                message_type=msg_dict.get("message_type", "unknown"),
+                id=msg_dict.get("id", msg_dict.get("id")),  # type: ignore
+                timestamp=msg_dict.get("timestamp", msg_dict.get("timestamp")),  # type: ignore
+                recipient_id=msg_dict.get("recipient_id"),
+                payload=msg_dict.get("payload", {}),
+                metadata=msg_dict.get("metadata", {}),
+                method=msg_dict.get("method"),
+                params=msg_dict.get("params"),
+                result=msg_dict.get("result"),
+                error=msg_dict.get("error"),
+                jsonrpc=msg_dict.get("jsonrpc", "2.0"),
+            )
 
         try:
             if not self._writer:
@@ -266,15 +289,33 @@ class MCPProtocol(Protocol):
         """Get a resource by URI."""
         result = await self.call_method(MCPMessage.Methods.RESOURCE_GET, {"uri": uri})
 
-        if result:
-            return MCPResource(**result)
+        if result and isinstance(result, dict):
+            # Create with explicit fields to satisfy type checker
+            return MCPResource(
+                uri=result.get("uri", uri),
+                type=result.get("type", MCPResourceType.TEXT),
+                metadata=result.get("metadata", {}),
+                content=result.get("content"),
+            )
         return None
 
     async def list_resources(self) -> list[MCPResource]:
         """List available resources."""
         result = await self.call_method(MCPMessage.Methods.RESOURCE_LIST)
         resources = result.get("resources", [])
-        return [MCPResource(**res) for res in resources]
+        valid_resources = []
+        for res in resources:
+            if isinstance(res, dict):
+                # Create with explicit fields to satisfy type checker
+                valid_resources.append(
+                    MCPResource(
+                        uri=res.get("uri", "unknown"),
+                        type=res.get("type", MCPResourceType.TEXT),
+                        metadata=res.get("metadata", {}),
+                        content=res.get("content"),
+                    )
+                )
+        return valid_resources
 
     async def call_tool(self, tool_name: str, arguments: dict[str, Any]) -> Any:
         """Call a tool."""
@@ -286,7 +327,19 @@ class MCPProtocol(Protocol):
         """List available tools."""
         result = await self.call_method(MCPMessage.Methods.TOOL_LIST)
         tools = result.get("tools", [])
-        return [MCPTool(**tool) for tool in tools]
+        valid_tools = []
+        for tool in tools:
+            if isinstance(tool, dict):
+                # Create with explicit fields to satisfy type checker
+                valid_tools.append(
+                    MCPTool(
+                        name=tool.get("name", "unknown"),
+                        description=tool.get("description", "No description"),
+                        parameters=tool.get("parameters", {}),
+                        required_capabilities=tool.get("required_capabilities", []),
+                    )
+                )
+        return valid_tools
 
     def register_capability(self, capability: MCPCapability) -> None:
         """Register a new capability."""
@@ -369,14 +422,20 @@ class MCPProtocol(Protocol):
 
             # Route to appropriate handler
             if message.method == MCPMessage.Methods.CONTEXT_GET:
-                key = message.params.get("key")
+                key = message.params.get("key") if message.params else None
                 result = self._context_store.get(key)
 
             elif message.method == MCPMessage.Methods.CONTEXT_SET:
-                key = message.params.get("key")
-                value = message.params.get("value")
-                self._context_store[key] = value
-                result = {"success": True}
+                if message.params:
+                    key = message.params.get("key")
+                    value = message.params.get("value")
+                    if key is not None:
+                        self._context_store[key] = value
+                        result = {"success": True}
+                    else:
+                        error = {"code": -32602, "message": "Missing key parameter"}
+                else:
+                    error = {"code": -32602, "message": "Missing params"}
 
             elif message.method == MCPMessage.Methods.CONTEXT_LIST:
                 result = {"keys": list(self._context_store.keys())}

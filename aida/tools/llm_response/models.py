@@ -15,13 +15,32 @@ class LLMResponseRequest(BaseModel):
     )
 
     @validator("question")
-    def question_not_empty(self, v):
+    def question_not_empty(cls, v):
+        """Validate that question is not empty.
+
+        Args:
+            v: Question value to validate
+
+        Returns:
+            Stripped question string
+
+        Raises:
+            ValueError: If question is empty
+        """
         if not v or not v.strip():
             raise ValueError("Question cannot be empty")
         return v.strip()
 
     @validator("context")
-    def clean_context(self, v):
+    def clean_context(cls, v):
+        """Clean and format context input.
+
+        Args:
+            v: Context value to clean (can be string, dict, or list)
+
+        Returns:
+            Formatted context string
+        """
         # Handle dict/list context by converting to string
         if isinstance(v, dict | list):
             import json

@@ -37,6 +37,14 @@ class ChatSession:
     """Enhanced chat session with improved UX."""
 
     def __init__(self):
+        """Initialize a new chat session.
+
+        Sets up the chat environment with:
+        - Tool registry for available tools
+        - Empty conversation history
+        - Session tracking with unique ID based on timestamp
+        - Multiline input support for complex queries
+        """
         self.agent: Agent | None = None
         # LLM will be accessed through orchestrator
         self.tool_registry = get_tool_registry()

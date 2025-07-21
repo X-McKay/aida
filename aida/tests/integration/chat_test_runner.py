@@ -16,6 +16,11 @@ class ChatTestRunner:
     """Runs integration tests for chat functionality without hardcoding responses."""
 
     def __init__(self, verbose: bool = False):
+        """Initialize the chat test runner.
+
+        Args:
+            verbose: Whether to print detailed test output during execution
+        """
         self.verbose = verbose
         self.orchestrator = None
         self.test_results = []
@@ -108,7 +113,7 @@ class ChatTestRunner:
 
         for i, question in enumerate(questions):
             if self.verbose:
-                print(f"\n  [{i+1}/{len(questions)}] {question[:50]}...")
+                print(f"\n  [{i + 1}/{len(questions)}] {question[:50]}...")
 
             result = await self.run_question(question)
             results.append(result)
@@ -143,9 +148,9 @@ class ChatTestRunner:
             "total_questions": len(questions),
             "successful": success_count,
             "success_rate": (success_count / len(questions)) * 100 if questions else 0,
-            "average_time": sum(r["execution_time"] for r in results) / len(results)
-            if results
-            else 0,
+            "average_time": (
+                sum(r["execution_time"] for r in results) / len(results) if results else 0
+            ),
             "results": results,
         }
 

@@ -14,6 +14,12 @@ class ExecutionMCPServer(SimpleMCPServer):
     """MCP server wrapper for ExecutionTool."""
 
     def __init__(self, execution_tool):
+        """Initialize the MCP server for execution tool.
+
+        Args:
+            execution_tool: The ExecutionTool instance to wrap with MCP server capabilities.
+                Provides code execution functionality in various languages.
+        """
         operations = {
             "execute": {
                 "description": "Execute code in a secure container",

@@ -7,7 +7,7 @@ from aida.config.llm_profiles import Purpose
 from .manager import LLMManager
 
 # Global manager instance
-_manager: LLMManager = None
+_manager: LLMManager | None = None
 
 
 def get_llm() -> LLMManager:
@@ -15,7 +15,10 @@ def get_llm() -> LLMManager:
     global _manager
     if _manager is None:
         _manager = LLMManager()
-    return _manager
+    # Type narrowing with cast
+    from typing import cast
+
+    return cast(LLMManager, _manager)
 
 
 async def chat(

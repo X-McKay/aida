@@ -24,6 +24,7 @@ RUN uv sync --frozen --no-install-project --no-dev
 FROM python:3.11-slim
 
 # Install runtime dependencies
+# hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y \
     --no-install-recommends \
     curl \

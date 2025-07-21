@@ -17,6 +17,7 @@ class LLMManager:
     """Simple LLM manager with purpose-based routing."""
 
     def __init__(self):
+        """Initialize LLM manager and setup purpose-based agents."""
         self._agents: dict[Purpose, Agent] = {}
         self._setup_models()
 
@@ -49,6 +50,8 @@ class LLMManager:
             )
         elif spec.provider in [Provider.OLLAMA, Provider.VLLM]:
             # Both Ollama and vLLM use OpenAI-compatible interface
+            if spec.base_url is None:
+                raise ValueError(f"base_url is required for {spec.provider}")
             base_url = spec.base_url + "/v1" if spec.provider == Provider.OLLAMA else spec.base_url
             return OpenAIModel(
                 spec.model_id, provider=OpenAIProvider(base_url=base_url), settings=settings
