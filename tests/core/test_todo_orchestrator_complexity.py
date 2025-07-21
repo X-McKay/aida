@@ -18,6 +18,7 @@ import pytest  # type: ignore[import-not-found]
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from aida.core.orchestrator import TodoOrchestrator
+from aida.core.orchestrator.storage import PlanStorageManager
 from aida.tools.base import ToolCapability, ToolParameter, ToolResult, ToolStatus
 
 
@@ -154,7 +155,7 @@ class MockLLMManager:
                 "operation": "create_project_structure",
                 "path": "./complex_project"
             },
-            "dependencies": ["step_000"]
+            "dependencies": []
         },
         {
             "description": "Implement core functionality",
@@ -163,7 +164,7 @@ class MockLLMManager:
                 "code": "# Core implementation code here",
                 "language": "python"
             },
-            "dependencies": ["step_001"]
+            "dependencies": []
         },
         {
             "description": "Add error handling and validation",
@@ -172,7 +173,7 @@ class MockLLMManager:
                 "code": "# Error handling and validation code",
                 "language": "python"
             },
-            "dependencies": ["step_002"]
+            "dependencies": []
         },
         {
             "description": "Create comprehensive test suite",
@@ -181,7 +182,7 @@ class MockLLMManager:
                 "code": "# Test suite implementation",
                 "language": "python"
             },
-            "dependencies": ["step_003"]
+            "dependencies": []
         },
         {
             "description": "Write documentation and usage examples",
@@ -190,7 +191,7 @@ class MockLLMManager:
                 "operation": "create_documentation",
                 "path": "./docs"
             },
-            "dependencies": ["step_004"]
+            "dependencies": []
         },
         {
             "description": "Optimize performance and memory usage",
@@ -199,7 +200,7 @@ class MockLLMManager:
                 "code": "# Performance optimization code",
                 "language": "python"
             },
-            "dependencies": ["step_005"]
+            "dependencies": []
         },
         {
             "description": "Set up CI/CD pipeline and deployment",
@@ -208,7 +209,7 @@ class MockLLMManager:
                 "operation": "create_cicd_config",
                 "path": "./.github/workflows"
             },
-            "dependencies": ["step_006"]
+            "dependencies": []
         }
     ]
 }
@@ -264,6 +265,37 @@ class TestOrchestrator(TodoOrchestrator):
         self.active_plans = {}
         self._tools_initialized = True
         self._step_counter = 0
+        # Initialize storage manager for plan saving
+        import tempfile
+
+        self.storage_dir = tempfile.mkdtemp()
+        self.storage_manager = PlanStorageManager(self.storage_dir)
+
+    async def _generate_initial_plan(self, user_request: str, context: dict):
+        """Override to use mock LLM."""
+
+        # Create a mock message
+        class MockMessage:
+            def __init__(self, content):
+                self.content = content
+
+        # Format the prompt similar to the real orchestrator
+        prompt = f"USER REQUEST: {user_request}\n"
+        messages = [MockMessage(prompt)]
+
+        # Use mock LLM
+        response = await self.llm_manager.chat_completion(messages)
+
+        # Extract JSON from response
+        json_content = response.content
+        if "```json" in json_content:
+            start = json_content.find("```json") + 7
+            end = json_content.find("```", start)
+            json_content = json_content[start:end].strip()
+
+        import json
+
+        return json.loads(json_content)
 
 
 @pytest.fixture

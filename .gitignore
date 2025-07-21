@@ -52,6 +52,9 @@ htmlcov/
 Thumbs.db
 ehthumbs.db
 
+# Node.js
+node_modules/
+
 # Logs
 *.log
 logs/

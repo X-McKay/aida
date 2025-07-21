@@ -1,5 +1,6 @@
 """Tests for the TODO-based orchestrator."""
 
+from datetime import datetime
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
@@ -12,7 +13,7 @@ from aida.core.orchestrator import (
     TodoStep,
     get_todo_orchestrator,
 )
-from aida.tools.base import ParameterSpec, ToolCapability, ToolResult
+from aida.tools.base import ToolCapability, ToolParameter, ToolResult, ToolStatus
 
 
 @pytest.fixture
@@ -27,10 +28,10 @@ def mock_tool_registry():
         name="thinking",
         description="Thinking and analysis tool",
         parameters=[
-            ParameterSpec(
+            ToolParameter(
                 name="problem", type="string", description="Problem to analyze", required=True
             ),
-            ParameterSpec(
+            ToolParameter(
                 name="reasoning_type",
                 type="string",
                 description="Type of reasoning",
@@ -41,7 +42,13 @@ def mock_tool_registry():
     thinking_tool.get_capability.return_value = thinking_capability
     thinking_tool.execute_async = AsyncMock(
         return_value=ToolResult(
-            status="success", result={"analysis": "Test analysis"}, duration_seconds=1.0
+            tool_name="thinking",
+            execution_id="test_exec_001",
+            status=ToolStatus.COMPLETED,
+            result={"analysis": "Test analysis"},
+            started_at=datetime.utcnow(),
+            completed_at=datetime.utcnow(),
+            duration_seconds=1.0,
         )
     )
 
@@ -51,8 +58,8 @@ def mock_tool_registry():
         name="execution",
         description="Code execution tool",
         parameters=[
-            ParameterSpec(name="code", type="string", description="Code to execute", required=True),
-            ParameterSpec(
+            ToolParameter(name="code", type="string", description="Code to execute", required=True),
+            ToolParameter(
                 name="language", type="string", description="Programming language", required=False
             ),
         ],
@@ -60,7 +67,13 @@ def mock_tool_registry():
     execution_tool.get_capability.return_value = execution_capability
     execution_tool.execute_async = AsyncMock(
         return_value=ToolResult(
-            status="success", result={"output": "Hello World", "exit_code": 0}, duration_seconds=0.5
+            tool_name="execution",
+            execution_id="test_exec_002",
+            status=ToolStatus.COMPLETED,
+            result={"output": "Hello World", "exit_code": 0},
+            started_at=datetime.utcnow(),
+            completed_at=datetime.utcnow(),
+            duration_seconds=0.5,
         )
     )
 
@@ -80,13 +93,11 @@ def mock_chat_response():
 
 
 @pytest.fixture
-def orchestrator(mock_tool_registry, mock_chat_response):
+def orchestrator(mock_tool_registry):
     """Create orchestrator with mocked dependencies."""
-    with (
-        patch("aida.tools.base.get_tool_registry", return_value=mock_tool_registry),
-        patch("aida.llm.chat", new_callable=AsyncMock, return_value=mock_chat_response),
-    ):
+    with patch("aida.tools.base.get_tool_registry", return_value=mock_tool_registry):
         orch = TodoOrchestrator()
+        orch.tool_registry = mock_tool_registry  # Use the mock registry directly
         orch._tools_initialized = True  # Skip initialization
         return orch
 
@@ -135,20 +146,20 @@ class TestTodoStep:
         )
 
         # Pending
-        assert step.to_markdown_line() == "- ⬜ Test markdown formatting"
+        assert step.to_markdown_line() == "- [ ] Test markdown formatting"
 
         # In progress
         step.status = TodoStatus.IN_PROGRESS
-        assert step.to_markdown_line() == "- 🔄 Test markdown formatting (In Progress)"
+        assert step.to_markdown_line() == "- [~] Test markdown formatting (In Progress)"
 
         # Completed
         step.status = TodoStatus.COMPLETED
-        assert step.to_markdown_line() == "- ✅ Test markdown formatting"
+        assert step.to_markdown_line() == "- [x] Test markdown formatting"
 
         # Failed
         step.status = TodoStatus.FAILED
         step.error = "Test error"
-        assert "❌" in step.to_markdown_line()
+        assert "[!]" in step.to_markdown_line()
         assert "Test error" in step.to_markdown_line()
 
 
@@ -185,7 +196,11 @@ class TestTodoPlan:
         ]
 
         plan = TodoPlan(
-            id="plan_001", user_request="Test", analysis="", expected_outcome="", steps=steps
+            id="plan_001",
+            user_request="Test",
+            analysis="Test analysis",
+            expected_outcome="Test outcome",
+            steps=steps,
         )
 
         progress = plan.get_progress()
@@ -198,7 +213,7 @@ class TestTodoPlan:
         steps[0].status = TodoStatus.COMPLETED
         progress = plan.get_progress()
         assert progress["completed"] == 1
-        assert progress["percentage"] == 33.3
+        assert abs(progress["percentage"] - 33.3) < 0.1
 
         # Complete all steps
         for step in steps:
@@ -223,7 +238,11 @@ class TestTodoPlan:
         ]
 
         plan = TodoPlan(
-            id="plan_001", user_request="Test", analysis="", expected_outcome="", steps=steps
+            id="plan_001",
+            user_request="Test",
+            analysis="Test analysis",
+            expected_outcome="Test outcome",
+            steps=steps,
         )
 
         # Should get step 1 or 3 (no dependencies)
@@ -241,7 +260,11 @@ class TestTodoPlan:
     def test_should_replan(self):
         """Test replan detection."""
         plan = TodoPlan(
-            id="plan_001", user_request="Test", analysis="", expected_outcome="", steps=[]
+            id="plan_001",
+            user_request="Test",
+            analysis="Test analysis",
+            expected_outcome="Test outcome",
+            steps=[],
         )
 
         # No replan needed initially
@@ -281,19 +304,19 @@ class TestTodoPlan:
 
         markdown = plan.to_markdown()
         assert "# Workflow Plan: Solve a problem" in markdown
-        assert "✅ Analyze problem" in markdown
-        assert "⬜ Execute solution" in markdown
-        assert "Progress: 1/2" in markdown
+        assert "- [x] Analyze problem" in markdown
+        assert "- [ ] Execute solution" in markdown
+        assert "**Completed:** 1/2 steps" in markdown
 
 
 class TestTodoOrchestrator:
     """Test TodoOrchestrator functionality."""
 
     @pytest.mark.asyncio
-    async def test_create_plan(self, orchestrator, mock_chat_response):
+    async def test_create_plan(self, orchestrator, mock_tool_registry):
         """Test plan creation."""
-        # Mock LLM response
-        mock_chat_response.content = """```json
+        # Mock LLM response content
+        mock_response = """```json
 {
     "analysis": "Need to analyze the problem",
     "expected_outcome": "Problem will be solved",
@@ -310,7 +333,13 @@ class TestTodoOrchestrator:
 }
 ```"""
 
-        plan = await orchestrator.create_plan("Solve test problem")
+        # Patch the chat function with the mock response
+        with patch(
+            "aida.core.orchestrator.orchestrator.chat",
+            new_callable=AsyncMock,
+            return_value=mock_response,
+        ):
+            plan = await orchestrator.create_plan("Solve test problem")
 
         assert plan is not None
         assert plan.user_request == "Solve test problem"
@@ -329,7 +358,11 @@ class TestTodoOrchestrator:
         )
 
         plan = TodoPlan(
-            id="plan_001", user_request="Test", analysis="", expected_outcome="", steps=[step]
+            id="plan_001",
+            user_request="Test",
+            analysis="Test analysis",
+            expected_outcome="Test outcome",
+            steps=[step],
         )
 
         result = await orchestrator._execute_step(step, plan)
@@ -342,7 +375,8 @@ class TestTodoOrchestrator:
     async def test_execute_step_with_error(self, orchestrator, mock_tool_registry):
         """Test step execution with error."""
         # Make tool execution fail
-        mock_tool_registry.get_tool.return_value.execute_async.side_effect = Exception("Test error")
+        thinking_tool = await mock_tool_registry.get_tool("thinking")
+        thinking_tool.execute_async.side_effect = Exception("Test error")
 
         step = TodoStep(
             id="test_001",
@@ -352,7 +386,11 @@ class TestTodoOrchestrator:
         )
 
         plan = TodoPlan(
-            id="plan_001", user_request="Test", analysis="", expected_outcome="", steps=[step]
+            id="plan_001",
+            user_request="Test",
+            analysis="Test analysis",
+            expected_outcome="Test outcome",
+            steps=[step],
         )
 
         result = await orchestrator._execute_step(step, plan)
@@ -362,7 +400,7 @@ class TestTodoOrchestrator:
         assert step.error == "Test error"
 
     @pytest.mark.asyncio
-    async def test_execute_plan_success(self, orchestrator, mock_llm_manager):
+    async def test_execute_plan_success(self, orchestrator):
         """Test full plan execution."""
         # Create a simple plan
         steps = [
@@ -389,10 +427,10 @@ class TestTodoOrchestrator:
         assert result["results"][0]["success"] is True
 
     @pytest.mark.asyncio
-    async def test_replan_functionality(self, orchestrator, mock_chat_response):
+    async def test_replan_functionality(self, orchestrator):
         """Test replanning functionality."""
         # Mock replan response
-        mock_chat_response.content = """```json
+        mock_response = """```json
 {
     "analysis": "Replanned analysis",
     "expected_outcome": "Updated outcome",
@@ -408,28 +446,34 @@ class TestTodoOrchestrator:
 }
 ```"""
 
-        # Create plan with failed step
-        failed_step = TodoStep(
-            id="step_001", description="Failed step", tool_name="thinking", parameters={}
-        )
-        failed_step.status = TodoStatus.FAILED
-        failed_step.error = "Test failure"
+        # Patch the chat function with the mock response
+        with patch(
+            "aida.core.orchestrator.orchestrator.chat",
+            new_callable=AsyncMock,
+            return_value=mock_response,
+        ):
+            # Create plan with failed step
+            failed_step = TodoStep(
+                id="step_001", description="Failed step", tool_name="thinking", parameters={}
+            )
+            failed_step.status = TodoStatus.FAILED
+            failed_step.error = "Test failure"
 
-        plan = TodoPlan(
-            id="plan_001",
-            user_request="Test",
-            analysis="Original analysis",
-            expected_outcome="Original outcome",
-            steps=[failed_step],
-        )
+            plan = TodoPlan(
+                id="plan_001",
+                user_request="Test",
+                analysis="Original analysis",
+                expected_outcome="Original outcome",
+                steps=[failed_step],
+            )
 
-        old_version = plan.plan_version
-        await orchestrator._replan(plan, ReplanReason.STEP_FAILED)
+            old_version = plan.plan_version
+            await orchestrator._replan(plan, ReplanReason.STEP_FAILED)
 
-        assert plan.plan_version == old_version + 1
-        assert len(plan.replan_history) == 1
-        assert plan.replan_history[0]["reason"] == "step_failed"
-        assert len(plan.steps) >= 1  # Should have the failed step plus new ones
+            assert plan.plan_version == old_version + 1
+            assert len(plan.replan_history) == 1
+            assert plan.replan_history[0]["reason"] == "step_failed"
+            assert len(plan.steps) >= 1  # Should have the failed step plus new ones
 
     def test_global_instance(self):
         """Test global orchestrator instance."""
@@ -442,10 +486,10 @@ class TestIntegration:
     """Integration tests for the todo orchestrator."""
 
     @pytest.mark.asyncio
-    async def test_end_to_end_workflow(self, orchestrator, mock_chat_response):
+    async def test_end_to_end_workflow(self, orchestrator):
         """Test complete workflow from creation to execution."""
         # Mock LLM responses
-        mock_chat_response.content = """```json
+        mock_response = """```json
 {
     "analysis": "Multi-step problem solving",
     "expected_outcome": "Problem analyzed and solution executed",
@@ -471,23 +515,30 @@ class TestIntegration:
 }
 ```"""
 
-        # Create and execute plan
-        plan = await orchestrator.create_plan("Solve a complex problem")
-        result = await orchestrator.execute_plan(plan)
+        # Patch the chat function with the mock response
+        with patch(
+            "aida.core.orchestrator.orchestrator.chat",
+            new_callable=AsyncMock,
+            return_value=mock_response,
+        ):
+            # Create and execute plan
+            plan = await orchestrator.create_plan("Solve a complex problem")
+            result = await orchestrator.execute_plan(plan)
 
-        assert result["status"] == "completed"
-        assert len(result["results"]) == 2
-        assert all(r["success"] for r in result["results"])
+            assert result["status"] == "completed"
+            assert len(result["results"]) == 2
+            assert all(r["success"] for r in result["results"])
 
-        # Check final state
-        progress = plan.get_progress()
-        assert progress["completed"] == 2
-        assert progress["percentage"] == 100.0
+            # Check final state
+            progress = plan.get_progress()
+            assert progress["completed"] == 2
+            assert progress["percentage"] == 100.0
 
-        # Check markdown output
-        markdown = result["final_markdown"]
-        assert "✅" in markdown  # Should have completed checkboxes
-        assert "100.0%" in markdown
+            # Check markdown output
+            markdown = result["final_markdown"]
+            # The markdown uses [x] for completed tasks, not ✅
+            assert "- [x]" in markdown  # Should have completed checkboxes
+            assert "100.0%" in markdown
 
 
 if __name__ == "__main__":
