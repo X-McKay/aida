@@ -30,7 +30,7 @@ jobs:
 
       - name: Run smoke tests
         run: |
-          uv run python smoke_test.py
+          uv run python tests/scripts/smoke_test.py
 
       - name: Comment on PR if failed
         if: failure() && github.event_name == 'pull_request'
@@ -41,5 +41,5 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: '❌ Smoke tests failed! Please run `uv run python smoke_test.py` locally and fix issues before merging.'
+              body: '❌ Smoke tests failed! Please run `uv run python tests/scripts/smoke_test.py` locally and fix issues before merging.'
             })
