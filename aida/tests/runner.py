@@ -3,9 +3,9 @@
 import asyncio
 import sys
 
-from aida.tests.base import TestResult, test_registry
-
 # Import test suites to register them
+from aida.tests import integration  # noqa: F401
+from aida.tests.base import TestResult, test_registry
 
 
 class AIDATestRunner:
