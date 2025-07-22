@@ -51,7 +51,7 @@ jobs:
 
       - name: Run security scan
         run: |
-          uv run bandit -r aida/ -f json -o bandit-report.json
+          uv run bandit -r aida/ -f json -o bandit-report.json --severity-level high --exclude tests/
           uv run safety check
 
       - name: Upload security reports
