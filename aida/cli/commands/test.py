@@ -7,6 +7,8 @@ from rich.panel import Panel
 from rich.table import Table
 import typer
 
+# Import to ensure test registration happens
+from aida.tests import integration  # noqa: F401
 from aida.tests.base import test_registry
 from aida.tests.runner import run_tests
 
