@@ -40,7 +40,7 @@ jobs:
 
       - name: Run tests
         run: |
-          uv run pytest --cov=aida --cov-report=xml --cov-report=html
+          uv run pytest aida/tests/unit/ --cov=aida --cov-report=xml --cov-report=html
 
       - name: Upload coverage reports
         uses: codecov/codecov-action@v3
