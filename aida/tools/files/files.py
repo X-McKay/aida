@@ -537,7 +537,7 @@ class FileOperationsTool(BaseModularTool[FileOperationRequest, FileOperationResp
 
         # Read file
         read_response = await self._read_file(request)
-        content = read_response.result
+        content = read_response.result["content"]
 
         # Perform replacement
         new_content = content.replace(request.search_text, request.replace_text)

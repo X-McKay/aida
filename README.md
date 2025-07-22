@@ -30,57 +30,55 @@ aida interactive
 aida execute "Analyze the codebase and suggest improvements"
 ```
 
+## Testing & Quality Assurance
+
+AIDA maintains high code quality with comprehensive testing:
+- **510 passing unit tests** with **54.21% code coverage**
+- Comprehensive protocol test coverage (A2A: 63%, MCP: 49%)
+- Integration tests for LLM and orchestrator systems
+- Real functionality testing without mocks
+- Automated CI/CD with coverage requirements
+
+Run tests:
+```bash
+# Run all unit tests with coverage
+uv run pytest aida/tests/unit/ --cov=aida
+
+# Run integration tests
+uv run python -m aida.cli.main test run --suite integration
+
+# List available test suites
+uv run python -m aida.cli.main test list
+```
+
 ## Directory Structure
 
 ```
 aida/
 ├── core/              # Core system components
+│   ├── orchestrator/  # Modular orchestration system
 │   ├── protocols/     # A2A and MCP protocols
 │   ├── events/        # Event system and messaging
 │   ├── state/         # State management
 │   └── memory/        # Context and memory management
-├── tools/             # Tool implementations
+├── tools/             # Hybrid tool implementations (v2.0.0)
 │   ├── execution/     # Task execution (Dagger.io)
 │   ├── thinking/      # Reasoning and analysis tools
 │   ├── files/         # File operation tools
 │   ├── system/        # System execution tools
 │   ├── context/       # Context management tools
-│   ├── maintenance/   # System maintenance tools
-│   ├── project/       # Project initialization tools
-│   └── architecture/  # Architecture analysis tools
-├── agents/            # Agent implementations
-│   ├── base/          # Base agent classes
-│   ├── coordinator/   # Coordinator agents
-│   └── worker/        # Worker agents
-├── providers/         # External service providers
-│   ├── llm/           # LLM provider integrations
-│   └── mcp/           # MCP provider implementations
-├── cli/               # Command-line interface
-│   ├── commands/      # CLI commands
-│   ├── ui/            # Terminal UI components
-│   └── handlers/      # Command handlers
-├── config/            # Configuration management
-│   ├── schemas/       # Configuration schemas
-│   └── loaders/       # Configuration loaders
-├── security/          # Security components
-│   ├── sandbox/       # Sandboxing implementation
-│   ├── auth/          # Authentication
-│   └── audit/         # Audit logging
-├── utils/             # Utility modules
-│   ├── logging/       # Logging utilities
-│   ├── validation/    # Validation utilities
-│   └── serialization/ # Serialization utilities
+│   └── llm_response/  # LLM response formatting tools
+├── llm/               # LLM system with PydanticAI integration
+├── cli/               # Enhanced CLI with chat interface
+│   ├── commands/      # CLI commands (chat, test, etc.)
+│   └── ui/            # Rich terminal UI components
+├── config/            # Configuration and model profiles
+├── providers/         # MCP provider implementations
 ├── templates/         # Project templates
-│   ├── projects/      # Project scaffolding templates
-│   └── configs/       # Configuration templates
-├── docs/              # Documentation
-│   ├── api/           # API documentation
-│   ├── guides/        # User guides
-│   └── examples/      # Usage examples
-└── tests/             # Test suite
-    ├── unit/          # Unit tests
-    ├── integration/   # Integration tests
-    └── e2e/           # End-to-end tests
+└── tests/             # Comprehensive test suite
+    ├── unit/          # 510+ unit tests (54.21% coverage)
+    ├── integration/   # Real LLM and orchestrator tests
+    └── scripts/       # Test utilities and smoke tests
 ```
 
 ## Features
