@@ -38,6 +38,8 @@ htmlcov/
 .nox/
 *.cover
 .hypothesis/
+coverage.xml
+bandit-report.json
 
 # IDE
 .vscode/

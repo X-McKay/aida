@@ -64,7 +64,7 @@ aida/
 ├── tools/             # Hybrid tool implementations (v2.0.0)
 │   ├── execution/     # Task execution (Dagger.io)
 │   ├── thinking/      # Reasoning and analysis tools
-│   ├── files/         # File operation tools
+│   ├── files/         # File operations (native + MCP support)
 │   ├── system/        # System execution tools
 │   ├── context/       # Context management tools
 │   └── llm_response/  # LLM response formatting tools
@@ -88,6 +88,7 @@ aida/
 - **Secure Execution** - Containerized task execution with Dagger.io
 - **Context Management** - Intelligent memory and conversation state management
 - **Tool Ecosystem** - Comprehensive suite of built-in tools
+- **MCP Filesystem Integration** - Optional support for official MCP filesystem server
 
 ### Security & Safety
 - **Sandboxed Execution** - Isolated execution environments

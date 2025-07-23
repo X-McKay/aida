@@ -12,6 +12,11 @@ class FilesConfig:
     MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
     MAX_BATCH_SIZE = 100  # Maximum operations in a batch
 
+    # MCP Server Configuration
+    USE_MCP_BACKEND = os.getenv("AIDA_FILES_USE_MCP", "false").lower() == "true"
+    MCP_SERVER_PACKAGE = "@modelcontextprotocol/server-filesystem"
+    MCP_NPX_TIMEOUT = 60  # seconds to wait for MCP server to start
+
     # Buffer sizes
     READ_BUFFER_SIZE = 8192
     WRITE_BUFFER_SIZE = 8192
