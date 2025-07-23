@@ -15,11 +15,8 @@ from aida.tools.files import FileOperation, FileOperationsTool
 
 async def test_mcp_filesystem():
     """Test MCP filesystem operations."""
-    print("🔧 Testing MCP Filesystem Integration")
+    print("🔧 Testing MCP Filesystem Operations")
     print("=" * 50)
-
-    # Enable MCP backend
-    os.environ["AIDA_FILES_USE_MCP"] = "true"
 
     # Create temporary test directory
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -140,45 +137,6 @@ async def test_mcp_filesystem():
                 await tool.cleanup()
 
 
-async def test_native_filesystem():
-    """Test native filesystem operations for comparison."""
-    print("\n\n🔧 Testing Native Filesystem (for comparison)")
-    print("=" * 50)
-
-    # Disable MCP backend
-    os.environ["AIDA_FILES_USE_MCP"] = "false"
-
-    # Create temporary test directory
-    with tempfile.TemporaryDirectory() as temp_dir:
-        print(f"📁 Test directory: {temp_dir}")
-
-        # Initialize tool
-        tool = FileOperationsTool()
-
-        # Test write and read
-        print("\n📝 Testing native write/read...")
-        test_file = os.path.join(temp_dir, "native_test.txt")
-
-        write_result = await tool.execute(
-            operation=FileOperation.WRITE.value,
-            path=test_file,
-            content="Hello from native filesystem!",
-        )
-
-        if write_result.status.value == "completed":
-            print("✅ Native write successful")
-
-            read_result = await tool.execute(operation=FileOperation.READ.value, path=test_file)
-
-            if read_result.status.value == "completed":
-                content = read_result.result.get("content", "")
-                print(f"✅ Native read successful: '{content}'")
-            else:
-                print(f"❌ Native read failed: {read_result.error}")
-        else:
-            print(f"❌ Native write failed: {write_result.error}")
-
-
 async def main():
     """Run all tests."""
     print("🚀 AIDA MCP Filesystem Integration Test")
@@ -194,16 +152,13 @@ async def main():
         print("❌ npx is not available. Please install Node.js.")
         return
 
-    # Run MCP tests
-    mcp_success = await test_mcp_filesystem()
+    # Run tests
+    success = await test_mcp_filesystem()
 
-    # Run native tests for comparison
-    await test_native_filesystem()
-
-    if mcp_success:
-        print("\n✨ MCP filesystem integration is working correctly!")
+    if success:
+        print("\n✨ MCP filesystem operations are working correctly!")
     else:
-        print("\n❌ MCP filesystem integration has issues.")
+        print("\n❌ MCP filesystem operations have issues.")
 
 
 if __name__ == "__main__":

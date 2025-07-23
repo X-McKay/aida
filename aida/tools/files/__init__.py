@@ -1,6 +1,7 @@
-"""File operations tool for comprehensive file and directory management."""
+"""File operations tool using official MCP filesystem server."""
 
 from .config import FilesConfig
+from .files import FileOperationsTool
 from .models import (
     FileInfo,
     FileOperation,
@@ -8,12 +9,6 @@ from .models import (
     FileOperationResponse,
     SearchScope,
 )
-
-# Conditionally import the appropriate implementation
-if FilesConfig.USE_MCP_BACKEND:
-    from .files_mcp import MCPFileOperationsTool as FileOperationsTool
-else:
-    from .files import FileOperationsTool
 
 __all__ = [
     "FileOperationsTool",

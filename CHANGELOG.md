@@ -8,14 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **MCP FILESYSTEM INTEGRATION**: Optional support for official MCP filesystem server
-  - MCPFilesystemClient for connecting to @modelcontextprotocol/server-filesystem
-  - MCPFilesystemAdapter for translating between AIDA and MCP operations
-  - Environment variable toggle (AIDA_FILES_USE_MCP) for easy switching
-  - Full backward compatibility with existing FileOperationsTool interface
-  - Process management for spawning Node.js MCP server
-  - Comprehensive test script for validating MCP operations
-  - Documentation guide for MCP filesystem usage
+- **MCP FILESYSTEM INTEGRATION**: Complete replacement of custom file operations with official MCP server
+  - FileOperationsTool now exclusively uses @modelcontextprotocol/server-filesystem
+  - Removed ~700 lines of custom file operation code
+  - MCPFilesystemClient manages Node.js subprocess and JSON-RPC communication
+  - Direct mapping of AIDA operations to MCP tools
+  - Composite operations (append, copy, search, find) handled with multiple MCP calls
+  - Process management for spawning and managing MCP server lifecycle
+  - Comprehensive test script for validating all operations
+  - Complete documentation guide for MCP filesystem usage
+  - Major version bump to 3.0.0 to reflect breaking changes
 - **ENHANCED CHAT MODE**: Complete CLI chat interface refactoring
   - Renamed 'interactive' command to 'chat' for better user experience
   - Streamlined command structure with single-character shortcuts (?, @, #, .)
