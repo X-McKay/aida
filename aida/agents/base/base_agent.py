@@ -152,7 +152,7 @@ class BaseAgent(ABC):
         await self.a2a_protocol.disconnect()
 
         # Cleanup MCP clients
-        for client in self.mcp_clients.values():
+        for _client in self.mcp_clients.values():
             try:
                 # TODO: Add cleanup method to MCPExecutor
                 pass

@@ -32,8 +32,8 @@ start_mcp_server() {
 
     # Check if already running
     local pid_file="$MCP_PID_DIR/${server_name}.pid"
-    if [ -f "$pid_file" ] && kill -0 $(cat "$pid_file") 2>/dev/null; then
-        echo -e "${YELLOW}  $server_name is already running (PID: $(cat $pid_file))${NC}"
+    if [ -f "$pid_file" ] && kill -0 "$(cat "$pid_file")" 2>/dev/null; then
+        echo -e "${YELLOW}  $server_name is already running (PID: $(cat "$pid_file"))${NC}"
         return 0
     fi
 
