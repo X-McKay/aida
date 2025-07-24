@@ -295,7 +295,17 @@ class TaskDispatcher:
                         f"Task {task_id} failed with non-retriable error: {last_error}",
                         extra={"task_id": task_id, "error": last_error},
                     )
-                    break
+                    self.metrics["failed"] += 1
+                    return TaskResult(
+                        task_id=task_id,
+                        step_id=step.id,
+                        success=False,
+                        error=last_error,
+                        retriable=False,
+                        retry_count=attempt,
+                        result=last_result,
+                        execution_time=execution_time,
+                    )
 
                 logger.warning(
                     f"Task {task_id} failed (attempt {attempt + 1}): {last_error}",
@@ -355,8 +365,9 @@ class TaskDispatcher:
             f"Executing task on agent {agent.agent_id}, has execute_task: {hasattr(agent, 'execute_task')}, has handle_message: {hasattr(agent, 'handle_message')}"
         )
 
-        if hasattr(agent, "execute_task"):
-            return await agent.execute_task(task_data)
+        if hasattr(agent, "execute_task") and callable(getattr(agent, "execute_task", None)):
+            execute_task = agent.execute_task
+            return await execute_task(task_data)
         elif hasattr(agent, "handle_message"):
             # Adapt to A2A message format
             from aida.core.protocols.a2a import A2AMessage

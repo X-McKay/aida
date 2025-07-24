@@ -184,7 +184,23 @@ class TaskReviser:
                 if "confidence" not in data or not isinstance(data["confidence"], int | float):
                     data["confidence"] = 0.8
 
-                return RevisionSuggestion(**data)
+                # Ensure all required fields are present
+                required_fields = [
+                    "revised_description",
+                    "revised_parameters",
+                    "approach_changes",
+                    "reasoning",
+                ]
+                for field in required_fields:
+                    if field not in data:
+                        logger.warning(f"Missing required field '{field}' in revision response")
+                        return None
+
+                try:
+                    return RevisionSuggestion(**data)  # type: ignore[missing-argument]
+                except Exception as e:
+                    logger.error(f"Failed to create RevisionSuggestion: {e}")
+                    return None
             else:
                 logger.warning("No valid JSON found in revision response")
                 return None

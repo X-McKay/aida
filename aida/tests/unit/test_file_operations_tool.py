@@ -377,7 +377,6 @@ class TestFileOperationsTool:
 
         # The batch operation is handled by _handle_complex_operation
         # We need to mock the internal execute calls properly
-        results = []
 
         # Keep the original execute method
         original_execute = tool.execute
@@ -423,7 +422,7 @@ class TestFileOperationsTool:
         result = await tool.execute(operation="read", path="/tmp/test.txt")
 
         assert result.status == ToolStatus.FAILED
-        assert "MCP file operation failed" in str(result.error)
+        assert "MCP connection error" in str(result.error)
 
     @pytest.mark.asyncio
     async def test_cleanup(self):
@@ -575,7 +574,7 @@ class TestFileOperationsTool:
 
         assert result.status == ToolStatus.FAILED
         # The error will be from validation when creating FileOperationRequest
-        assert "Error creating request" in str(result.error) or "Invalid" in str(result.error)
+        assert "validation error" in str(result.error) or "enum" in str(result.error)
 
 
 if __name__ == "__main__":

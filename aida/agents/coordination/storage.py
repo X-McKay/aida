@@ -1,7 +1,7 @@
 """Storage management for coordinator plans.
 
-This module provides persistent storage for TodoPlans created by the CoordinatorAgent,
-similar to the legacy orchestrator but adapted for the new agent architecture.
+Provides persistent storage for TodoPlans in the coordinator-worker architecture,
+with support for plan lifecycle management and archival.
 """
 
 import contextlib
@@ -20,11 +20,11 @@ logger = logging.getLogger(__name__)
 class CoordinatorPlanStorage:
     """Manages persistent storage and retrieval of plans for the coordinator.
 
-    This provides similar functionality to the legacy PlanStorageManager but
-    is designed for the new coordinator-worker architecture.
+    Handles plan lifecycle including creation, archival, and cleanup operations
+    with support for concurrent access and atomic operations.
     """
 
-    def __init__(self, storage_dir: str = ".aida/coordinator/plans"):
+    def __init__(self, storage_dir: str = ".aida/orchestrator"):
         """Initialize plan storage with specified directory.
 
         Args:
@@ -120,10 +120,12 @@ class CoordinatorPlanStorage:
             with open(filepath) as f:
                 data = json.load(f)
 
-            # Convert back to TodoPlan
-            # Note: This is a simplified version - in production, you'd use
-            # TodoPlan.from_json() or similar deserialization
-            return TodoPlan.from_json(json.dumps(data))
+            # Convert back to TodoPlan using Pydantic
+            try:
+                return TodoPlan(**data)  # type: ignore[missing-argument]
+            except Exception as e:
+                logger.error(f"Failed to parse plan data: {e}")
+                return None
 
         except Exception as e:
             logger.error(f"Failed to load plan from {filepath}: {e}")
@@ -244,9 +246,8 @@ class CoordinatorPlanStorage:
         archived_count = 0
 
         for plan_info in self.list_plans("active"):
-            if plan_info["status"] == "completed":
-                if self.move_plan(plan_info["id"], "archived"):
-                    archived_count += 1
+            if plan_info["status"] == "completed" and self.move_plan(plan_info["id"], "archived"):
+                archived_count += 1
 
         logger.info(f"Archived {archived_count} completed plans")
         return archived_count

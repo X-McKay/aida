@@ -127,8 +127,8 @@ class CoordinatorAgent(BaseAgent):
         self._max_retries = 3
         self._task_timeout = 300.0
 
-        # Storage manager
-        storage_dir = getattr(config, "storage_dir", ".aida/coordinator/plans")
+        # Storage manager - use orchestrator path for compatibility
+        storage_dir = getattr(config, "storage_dir", ".aida/orchestrator")
         self._storage = CoordinatorPlanStorage(storage_dir)
 
         # LLM for planning
@@ -292,7 +292,7 @@ class CoordinatorAgent(BaseAgent):
             # Check if we should replan
             should_replan, reason = plan.should_replan()
             if should_replan and reason != ReplanReason.PERIODIC_CHECK:
-                logger.info(f"Replanning needed: {reason.value}")
+                logger.info(f"Replanning needed: {reason.value if reason else 'Unknown'}")
                 await self._replan(plan, reason)
 
             # Save current state periodically
@@ -1124,7 +1124,14 @@ Example:
             max_retries=step.max_retries,
         )
 
-        task_message = A2AMessage(**message_data)
+        task_message = A2AMessage(
+            sender_id=message_data["sender_id"],
+            message_type=message_data["message_type"],
+            recipient_id=message_data.get("recipient_id"),
+            payload=message_data["payload"],
+            priority=message_data.get("priority", 5),
+            requires_ack=message_data.get("requires_ack", False),
+        )
         logger.debug(
             f"Sending task assignment: type={task_message.message_type}, recipient={task_message.recipient_id}"
         )

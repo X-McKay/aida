@@ -1,135 +1,226 @@
 # AIDA - Advanced Intelligent Distributed Agent System
 
-A comprehensive, production-ready agentic system designed for complex multi-agent applications with enterprise-grade security, scalability, and extensibility.
+A modern agentic system featuring a coordinator-worker architecture with enterprise-grade security, scalability, and extensibility.
 
 ## Architecture Overview
 
-AIDA implements a modular, plugin-based architecture with the following core components:
+AIDA implements a **coordinator-worker architecture** where specialized agents collaborate to complete complex tasks:
 
-- **Agent-to-Agent (A2A) Communication Protocol** - Distributed agent coordination
-- **Model Context Protocol (MCP) Integration** - Efficient context management
-- **Containerized Execution Environment** - Secure task execution via Dagger.io
-- **Multi-LLM Provider Support** - Flexible AI model integration
-- **Rich CLI Interface** - Interactive and batch execution modes
-- **Comprehensive Tool Suite** - File operations, system execution, thinking tools
-- **Advanced Security** - Sandboxing, audit logging, and access controls
+- **CoordinatorAgent** - Plans tasks, delegates work, and manages execution flow
+- **Worker Agents** - Specialized agents (CodingWorker, ResearchWorker, etc.) that execute specific tasks
+- **Agent-to-Agent (A2A) Protocol** - Enables distributed agent communication
+- **Model Context Protocol (MCP)** - Standardized tool integration
+- **Hybrid Tool System** - Tools work across native AIDA, PydanticAI, and MCP interfaces
+- **Multi-LLM Support** - Ollama (default), OpenAI, Anthropic, and more
 
 ## Quick Start
 
 ```bash
-# Install with uv
-uv add aida
+# Install AIDA
+pip install aida-agent
 
-# Initialize a new project
-aida init my-project
+# Start interactive chat
+uv run aida chat
 
-# Start interactive mode
-aida interactive
+# Start the Text User Interface (TUI)
+uv run aida tui
 
-# Execute a task
-aida execute "Analyze the codebase and suggest improvements"
+# Run a specific test suite
+uv run aida test run --suite integration
+
+# Check system status
+uv run aida status
 ```
 
-## Testing & Quality Assurance
+## Core Components
 
-AIDA maintains high code quality with comprehensive testing:
-- **510 passing unit tests** with **54.21% code coverage**
-- Comprehensive protocol test coverage (A2A: 63%, MCP: 49%)
-- Integration tests for LLM and orchestrator systems
-- Real functionality testing without mocks
-- Automated CI/CD with coverage requirements
+### 1. Coordinator-Worker Architecture
 
-Run tests:
-```bash
-# Run all unit tests with coverage
-uv run pytest aida/tests/unit/ --cov=aida
+The system uses a distributed architecture where:
+- **CoordinatorAgent** creates execution plans and delegates tasks
+- **Worker Agents** execute specialized tasks based on their capabilities
+- **WorkerProxy** enables seamless remote worker integration
+- **TaskDispatcher** intelligently routes tasks to appropriate workers
 
-# Run integration tests
-uv run python -m aida.cli.main test run --suite integration
+### 2. Hybrid Tool System
 
-# List available test suites
-uv run python -m aida.cli.main test list
-```
+All tools support three interfaces:
+- **Native AIDA** - Direct tool execution via `execute()` method
+- **PydanticAI** - Integration with PydanticAI agents
+- **MCP Server** - Model Context Protocol for standardized tool access
+
+Example tools:
+- `FileOperationsTool` - File I/O via MCP filesystem server
+- `SystemExecutionTool` - Secure command execution
+- `WebSearchTool` - Web search via MCP SearXNG
+- `ThinkingTool` - Structured reasoning and analysis
+
+### 3. LLM System
+
+Flexible LLM integration with purpose-based routing:
+- **DEFAULT** - General tasks (Ollama llama3.2)
+- **CODING** - Code generation (DeepSeek Coder)
+- **REASONING** - Complex analysis (Ollama llama3.2)
+- **MULTIMODAL** - Image/text tasks
+- **QUICK** - Fast responses
+
+Configuration: `aida/config/llm_profiles.py`
 
 ## Directory Structure
 
 ```
 aida/
-├── core/              # Core system components
-│   ├── orchestrator/  # Modular orchestration system
-│   ├── protocols/     # A2A and MCP protocols
-│   ├── events/        # Event system and messaging
-│   ├── state/         # State management
-│   └── memory/        # Context and memory management
-├── tools/             # Hybrid tool implementations (v2.0.0)
-│   ├── execution/     # Task execution (Dagger.io)
-│   ├── thinking/      # Reasoning and analysis tools
-│   ├── files/         # File operations via MCP server
-│   ├── system/        # System execution tools
-│   ├── context/       # Context management tools
-│   └── llm_response/  # LLM response formatting tools
-├── llm/               # LLM system with PydanticAI integration
-├── cli/               # Enhanced CLI with chat interface
-│   ├── commands/      # CLI commands (chat, test, etc.)
-│   └── ui/            # Rich terminal UI components
-├── config/            # Configuration and model profiles
-├── providers/         # MCP provider implementations
-├── templates/         # Project templates
-└── tests/             # Comprehensive test suite
-    ├── unit/          # 510+ unit tests (54.21% coverage)
-    ├── integration/   # Real LLM and orchestrator tests
-    └── scripts/       # Test utilities and smoke tests
+├── agents/               # Agent implementations
+│   ├── base/            # Base agent classes and protocols
+│   ├── coordination/    # CoordinatorAgent and task management
+│   ├── worker/          # Worker agents (CodingWorker, etc.)
+│   └── mcp/             # MCP server integration
+├── core/                # Core infrastructure
+│   ├── orchestrator/    # TodoOrchestrator (compatibility wrapper)
+│   ├── protocols/       # A2A and MCP protocol implementations
+│   └── events/          # Event bus system
+├── tools/               # Hybrid tool implementations
+│   ├── base.py         # Base tool classes
+│   ├── file_operations/ # File I/O tool
+│   ├── system/         # System execution tool
+│   ├── websearch/      # Web search tool
+│   └── thinking/       # Analysis and reasoning tool
+├── llm/                 # LLM management system
+├── cli/                 # Command-line interface
+│   ├── commands/       # CLI commands
+│   └── tui/            # Text User Interface
+└── tests/              # Comprehensive test suite
 ```
 
-## Features
+## Key Features
 
-### Core Capabilities
-- **Multi-Agent Coordination** - Distributed agent networks with A2A communication
-- **Secure Execution** - Containerized task execution with Dagger.io
-- **Context Management** - Intelligent memory and conversation state management
-- **Tool Ecosystem** - Comprehensive suite of built-in tools
-- **MCP Filesystem Server** - All file operations via official MCP server
+### 1. Text User Interface (TUI)
+- Real-time system monitoring (CPU, Memory, GPU)
+- Live task tracking and progress updates
+- Interactive chat with visual feedback
+- Available agents display
 
-### Security & Safety
-- **Sandboxed Execution** - Isolated execution environments
-- **Principle of Least Privilege** - Minimal access rights
-- **Audit Logging** - Comprehensive operation tracking
-- **Input Validation** - Rigorous security controls
+### 2. Plan-Based Execution
+- Automatic task decomposition
+- Progress tracking and monitoring
+- Persistent plan storage in `.aida/orchestrator/`
+- Support for replanning and error recovery
 
-### Development Experience
-- **Modern Python Toolchain** - uv, ruff, mypy, pre-commit hooks
-- **Rich CLI Interface** - Interactive terminal UI with progress tracking
-- **Hot-Reloading** - Dynamic configuration updates
-- **Plugin System** - Extensible architecture
+### 3. Flexible Tool Integration
+- Tools work across multiple AI frameworks
+- MCP server integration for standardized access
+- Easy tool creation with hybrid support
+- Built-in observability via OpenTelemetry
 
-### LLM Integration
-- **Multi-Provider Support** - Ollama, OpenAI, Anthropic, Cohere, VLLM
-- **Intelligent Routing** - Model selection and fallback
-- **Local & Cloud** - Support for both local and remote models
+### 4. Production Features
+- Comprehensive error handling
+- Structured logging
+- State persistence
+- Graceful shutdown
+- Resource management
+
+## Development
+
+### Running Tests
+
+```bash
+# Run smoke tests (quick validation)
+uv run python tests/scripts/smoke_test.py
+
+# Run unit tests with coverage
+uv run pytest aida/tests/unit/ --cov=aida
+
+# Run integration tests
+uv run aida test run --suite integration
+
+# Run pre-commit hooks
+pre-commit run --all-files
+```
+
+### Creating New Tools
+
+Tools inherit from `ToolBase` and implement three interfaces:
+
+```python
+from aida.tools.base import ToolBase
+
+class MyTool(ToolBase):
+    async def execute(self, **kwargs):
+        """Native AIDA interface"""
+        pass
+
+    def to_pydantic_tool(self):
+        """PydanticAI compatibility"""
+        pass
+
+    async def to_mcp_tool(self):
+        """MCP server interface"""
+        pass
+```
+
+### Creating New Workers
+
+Workers inherit from `WorkerAgent`:
+
+```python
+from aida.agents.base import WorkerAgent
+
+class MyWorker(WorkerAgent):
+    async def execute_task(self, task_data):
+        """Execute assigned task"""
+        pass
+```
 
 ## Configuration
 
-AIDA uses YAML/TOML configuration with schema validation:
+### LLM Configuration
+Edit `aida/config/llm_profiles.py` to configure LLM providers and models.
 
-```yaml
-# aida.config.yaml
-system:
-  name: "aida"
-  version: "1.0.0"
+### System Configuration
+AIDA uses sensible defaults but can be configured via:
+- Environment variables
+- Configuration files in `.aida/`
+- Runtime parameters
 
-security:
-  sandbox_enabled: true
-  audit_logging: true
+## Common Workflows
 
-providers:
-  llm:
-    default: "ollama"
-    fallback: ["openai", "anthropic"]
-
-agents:
-  max_concurrent: 10
-  timeout: 300
+### 1. Interactive Development
+```bash
+uv run aida chat
+> Create a Python function to calculate fibonacci numbers
+> Add unit tests for the function
+> Optimize the implementation
 ```
+
+### 2. TUI Monitoring
+```bash
+uv run aida tui
+# Watch real-time task execution and system resources
+```
+
+### 3. Batch Processing
+```bash
+uv run aida execute "Analyze all Python files in src/ and suggest improvements"
+```
+
+## Troubleshooting
+
+### Ollama Connection Issues
+```bash
+# Check if Ollama is running
+curl http://localhost:11434/api/tags
+
+# Start Ollama
+ollama serve
+
+# Pull required model
+ollama pull llama3.2
+```
+
+### Task Execution Issues
+- Check worker logs in `.aida/logs/`
+- Verify plans in `.aida/orchestrator/active/`
+- Run smoke tests: `uv run python tests/scripts/smoke_test.py`
 
 ## License
 

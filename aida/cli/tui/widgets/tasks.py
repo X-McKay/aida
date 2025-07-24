@@ -1,5 +1,7 @@
 """Tasks widget for AIDA TUI - displays ongoing plans with clickable details."""
 
+from typing import cast
+
 from textual.app import ComposeResult
 from textual.containers import ScrollableContainer, Vertical
 from textual.message import Message
@@ -212,7 +214,7 @@ class TasksWidget(Widget):
     """
 
     plans: reactive[dict[str, dict]] = reactive({})
-    selected_plan: reactive[str | None] = reactive(None)
+    selected_plan: reactive[str | None] = reactive(cast(str | None, None))
 
     def compose(self) -> ComposeResult:
         """Create the tasks UI."""
@@ -245,7 +247,7 @@ class TasksWidget(Widget):
 
                 # Check stored plans
                 if hasattr(coordinator, "_storage"):
-                    stored_plans = coordinator._storage.list_plans(status="active")
+                    stored_plans = coordinator._storage.list_plans("active")
                     for plan_summary in stored_plans:
                         plan_id = plan_summary["id"]
                         plan = coordinator.load_plan(plan_id)
@@ -268,7 +270,12 @@ class TasksWidget(Widget):
                     self.plans = active_plans
                     self.refresh_plan_display()
 
-        except Exception:
+        except Exception as e:
+            # Log the error for debugging
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to load real plans: {e}")
             # If coordinator not available, show demo plans
             await self.simulate_plans()
 

@@ -90,11 +90,7 @@ class CodingWorker(WorkerAgent):
 
         # Initialize LLM client
         try:
-            llm_manager = get_llm()
-            # Set temperature for coding tasks
-            if hasattr(llm_manager, "temperature"):
-                llm_manager.temperature = 0.2
-            self._llm_client = llm_manager
+            self._llm_client = get_llm()
             logger.info("Initialized LLM client for coding tasks")
         except Exception as e:
             logger.warning(f"Failed to initialize LLM client: {e}")
@@ -228,10 +224,10 @@ class CodingWorker(WorkerAgent):
             "metrics": {
                 "total_lines": len(lines),
                 "code_lines": len(
-                    [l for l in lines if l.strip() and not l.strip().startswith("#")]
+                    [line for line in lines if line.strip() and not line.strip().startswith("#")]
                 ),
-                "comment_lines": len([l for l in lines if l.strip().startswith("#")]),
-                "blank_lines": len([l for l in lines if not l.strip()]),
+                "comment_lines": len([line for line in lines if line.strip().startswith("#")]),
+                "blank_lines": len([line for line in lines if not line.strip()]),
             },
         }
 
@@ -666,11 +662,11 @@ Generate the documentation:"""
                     functions += 1
                 elif isinstance(node, ast.ClassDef):
                     classes += 1
-                elif isinstance(node, (ast.Import, ast.ImportFrom)):
+                elif isinstance(node, ast.Import | ast.ImportFrom):
                     imports += 1
 
             return {"structure": {"functions": functions, "classes": classes, "imports": imports}}
-        except:
+        except Exception:
             return {"structure": {"error": "Failed to parse Python code"}}
 
     def _analyze_javascript(self, code: str) -> dict[str, Any]:

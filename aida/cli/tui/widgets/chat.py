@@ -141,6 +141,7 @@ class ChatWidget(Widget):
 
     async def on_input_submitted(self, event: Input.Submitted) -> None:
         """Handle input submission."""
+        import re
         import time
 
         # Debounce rapid submissions
@@ -150,7 +151,16 @@ class ChatWidget(Widget):
             return
         self._last_input_time = current_time
 
-        message = event.value.strip()
+        # Clean the input value - remove any escape sequences that might have leaked in
+        raw_value = event.value
+        # Strip ANSI escape sequences
+        clean_value = re.sub(r"\x1b\[[0-9;]*[mGKH]", "", raw_value)
+        # Strip cursor positioning sequences
+        clean_value = re.sub(r"\x1b\[\d+;\d+[Hf]", "", clean_value)
+        # Strip any other control characters except newlines and tabs
+        clean_value = "".join(c for c in clean_value if c.isprintable() or c in "\n\t")
+
+        message = clean_value.strip()
         if not message:
             return
 
@@ -329,7 +339,21 @@ class ChatWidget(Widget):
         self.query_one("#chat-input").focus()
 
     async def on_input_changed(self, event: Input.Changed) -> None:
-        """Monitor for unexpected input changes."""
+        """Monitor for unexpected input changes and clean escape sequences."""
+        import re
+
+        # Check for escape sequences or control characters
+        if "\x1b" in event.value or any(ord(c) < 32 and c not in "\n\t" for c in event.value):
+            # Clean the input immediately
+            clean_value = re.sub(r"\x1b\[[0-9;]*[mGKH]", "", event.value)
+            clean_value = re.sub(r"\x1b\[\d+;\d+[Hf]", "", clean_value)
+            clean_value = "".join(c for c in clean_value if c.isprintable() or c in "\n\t")
+
+            # Update the input field with clean value
+            event.input.value = clean_value
+            event.stop()
+            return
+
         # If the input has grown unexpectedly large, it might be the duplication bug
         if len(event.value) > 100 and event.value.count(event.value[0]) == len(event.value):
             # Clear the input if it looks like repeated characters

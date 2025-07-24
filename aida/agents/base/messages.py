@@ -164,6 +164,7 @@ class MessageRouter:
     """Routes messages between coordinator and workers."""
 
     def __init__(self):
+        """Initialize the message router with default rules."""
         self.routing_rules: list[MessageRoutingRule] = []
         self._setup_default_rules()
 

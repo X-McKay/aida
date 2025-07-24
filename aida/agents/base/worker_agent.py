@@ -14,8 +14,6 @@ from datetime import datetime
 import logging
 from typing import Any
 
-import dagger
-
 from aida.agents.base import (
     AgentConfig,
     BaseAgent,
@@ -107,7 +105,7 @@ class WorkerAgent(BaseAgent):
         self._task_executor: asyncio.Task | None = None
 
         # Container reference
-        self._container: dagger.Container | None = None
+        self._container: Any | None = None  # dagger.Container when available
 
         # Performance metrics
         self._tasks_completed = 0
@@ -218,7 +216,13 @@ class WorkerAgent(BaseAgent):
             else None,
         )
 
-        message = A2AMessage(**registration_data)
+        message = A2AMessage(
+            sender_id=registration_data["sender_id"],
+            message_type=registration_data["message_type"],
+            payload=registration_data["payload"],
+            priority=registration_data.get("priority", 5),
+            requires_ack=registration_data.get("requires_ack", False),
+        )
         response = await self.send_message(message)
 
         if response:
@@ -511,7 +515,14 @@ class WorkerAgent(BaseAgent):
             execution_time=execution_time,
         )
 
-        message = A2AMessage(**completion_data)
+        message = A2AMessage(
+            sender_id=completion_data["sender_id"],
+            message_type=completion_data["message_type"],
+            recipient_id=completion_data.get("recipient_id"),
+            payload=completion_data["payload"],
+            priority=completion_data.get("priority", 5),
+            requires_ack=completion_data.get("requires_ack", False),
+        )
         await self.send_message(message)
 
     async def _send_shutdown_notification(self) -> None:

@@ -300,13 +300,17 @@ class FileOperationsTool(BaseModularTool[FileOperationRequest, FileOperationResp
                         op_request = FileOperationRequest(**op_data)  # ty: ignore[missing-argument]
                         op_result = await self.execute(**op_data)
 
-                        results.append(
-                            {
-                                "operation": op_request.operation.value,
-                                "path": op_request.path,
-                                "success": op_result.status == ToolStatus.COMPLETED,
-                            }
-                        )
+                        result_entry = {
+                            "operation": op_request.operation.value,
+                            "path": op_request.path,
+                            "success": op_result.status == ToolStatus.COMPLETED,
+                        }
+
+                        # Add error message if operation failed
+                        if op_result.status == ToolStatus.FAILED and op_result.error:
+                            result_entry["error"] = op_result.error
+
+                        results.append(result_entry)
 
                         if op_result.status == ToolStatus.COMPLETED:
                             total_files += 1

@@ -15,14 +15,9 @@ logger = logging.getLogger(__name__)
 # For backward compatibility - import from new location
 from aida.agents.coordination.plan_models import ReplanReason, TodoPlan, TodoStatus, TodoStep
 
-# Import old classes for compatibility
-try:
-    from .config import OrchestratorConfig
-    from .storage import PlanStorageManager
-except ImportError:
-    # These may be removed already
-    OrchestratorConfig = None
-    PlanStorageManager = None
+# Legacy classes removed - set to None for compatibility
+OrchestratorConfig = None
+PlanStorageManager = None
 
 # Global instances for compatibility
 _coordinator_instance = None
@@ -54,7 +49,7 @@ class TodoOrchestrator:
                 capabilities=["planning", "task_delegation", "agent_coordination"],
             )
             self.coordinator = CoordinatorAgent(config=config)
-            # Set storage directory directly on the coordinator's storage
+            # Override storage to use the same directory
             self.coordinator._storage = CoordinatorPlanStorage(self.storage_dir)
             await self.coordinator.start()
 
@@ -62,9 +57,19 @@ class TodoOrchestrator:
             self.worker = CodingWorker("legacy_worker")
             await self.worker.start()
 
-            # For local operation, directly register the worker with the coordinator
-            # This bypasses the A2A registration for in-process operation
-            self.coordinator._known_workers[self.worker.agent_id] = self.worker
+            # For local operation, create a WorkerProxy for the worker
+            from aida.agents.coordination.worker_proxy import WorkerProxy
+
+            proxy = WorkerProxy(
+                worker_id=self.worker.agent_id,
+                capabilities=self.worker.config.capabilities,
+                coordinator_agent=self.coordinator,
+            )
+            # For local operation, set the actual worker on the proxy
+            proxy._worker = self.worker
+
+            # Register the proxy with the coordinator
+            self.coordinator._known_workers[self.worker.agent_id] = proxy
             await self.coordinator._update_dispatcher()
 
             # Wait for registration

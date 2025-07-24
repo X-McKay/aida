@@ -7,7 +7,6 @@ import pytest
 
 from aida.providers.mcp.base import MCPMessage
 from aida.providers.mcp.filesystem_client import MCPFilesystemClient
-from aida.tools.websearch.websearch import MCPSearXNGClient
 
 
 @pytest.fixture
@@ -26,20 +25,20 @@ def mock_mcp_filesystem_client():
     return client
 
 
-@pytest.fixture
-def mock_mcp_searxng_client():
-    """Create a mock MCP SearXNG client."""
-    client = AsyncMock(spec=MCPSearXNGClient)
-    client.connect = AsyncMock(return_value=True)
-    client.disconnect = AsyncMock()
-    client.call_tool = AsyncMock()
-    client._connected = True
-    client._message_id = 0
+# @pytest.fixture
+# def mock_mcp_searxng_client():
+#     """Create a mock MCP SearXNG client."""
+#     client = AsyncMock(spec=MCPSearXNGClient)
+#     client.connect = AsyncMock(return_value=True)
+#     client.disconnect = AsyncMock()
+#     client.call_tool = AsyncMock()
+#     client._connected = True
+#     client._message_id = 0
 
-    # Default responses for common operations
-    client.call_tool.return_value = {"results": []}
+#     # Default responses for common operations
+#     client.call_tool.return_value = {"results": []}
 
-    return client
+#     return client
 
 
 @pytest.fixture
@@ -104,41 +103,46 @@ def file_operation_response():
     }
 
 
+# @pytest.fixture
+# def web_search_response():
+#     """Common web search responses."""
+#     return {
+#         "search": {
+#             "results": [
+#                 {
+#                     "title": "Search Result 1",
+#                     "url": "https://example1.com",
+#                     "snippet": "This is the first search result",
+#                     "metadata": {"rank": 1},
+#                 },
+#                 {
+#                     "title": "Search Result 2",
+#                     "url": "https://example2.com",
+#                     "snippet": "This is the second search result",
+#                     "metadata": {"rank": 2},
+#                 },
+#             ]
+#         },
+#         "website": {
+#             "content": {
+#                 "title": "Example Website",
+#                 "text": "This is the website content that was extracted.",
+#                 "word_count": 10,
+#                 "citations": ["https://example.com/source"],
+#             }
+#         },
+#         "datetime": {
+#             "datetime": "2024-01-15 12:00:00",
+#             "timezone": "UTC",
+#             "unix_timestamp": 1705320000,
+#             "utc_offset": "+00:00",
+#         },
+#     }
+
+
 @pytest.fixture
-def web_search_response():
-    """Common web search responses."""
-    return {
-        "search": {
-            "results": [
-                {
-                    "title": "Search Result 1",
-                    "url": "https://example1.com",
-                    "snippet": "This is the first search result",
-                    "metadata": {"rank": 1},
-                },
-                {
-                    "title": "Search Result 2",
-                    "url": "https://example2.com",
-                    "snippet": "This is the second search result",
-                    "metadata": {"rank": 2},
-                },
-            ]
-        },
-        "website": {
-            "content": {
-                "title": "Example Website",
-                "text": "This is the website content that was extracted.",
-                "word_count": 10,
-                "citations": ["https://example.com/source"],
-            }
-        },
-        "datetime": {
-            "datetime": "2024-01-15 12:00:00",
-            "timezone": "UTC",
-            "unix_timestamp": 1705320000,
-            "utc_offset": "+00:00",
-        },
-    }
+def llm_response_response():
+    """Common LLM response responses."""
 
 
 # Async helpers
@@ -184,17 +188,17 @@ def sample_file_paths():
     }
 
 
-@pytest.fixture
-def sample_search_queries():
-    """Sample search queries for testing."""
-    return {
-        "general": "Python programming tutorial",
-        "images": "cute cats",
-        "videos": "machine learning course",
-        "files": "python cheat sheet pdf",
-        "map": "restaurants near me",
-        "social": "AI news Twitter",
-    }
+# @pytest.fixture
+# def sample_search_queries():
+#     """Sample search queries for testing."""
+#     return {
+#         "general": "Python programming tutorial",
+#         "images": "cute cats",
+#         "videos": "machine learning course",
+#         "files": "python cheat sheet pdf",
+#         "map": "restaurants near me",
+#         "social": "AI news Twitter",
+#     }
 
 
 @pytest.fixture

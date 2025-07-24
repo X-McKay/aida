@@ -2,303 +2,272 @@
 
 ## Overview
 
-AIDA uses a distributed agent architecture with specialized workers coordinated by a central orchestrator. This design enables parallel task execution, specialized capabilities, and scalable workloads.
+AIDA implements a **coordinator-worker architecture** where specialized agents collaborate through the Agent-to-Agent (A2A) protocol to complete complex tasks.
 
 ## Core Components
 
-### 1. Coordinator Agent (`aida/agents/coordination/`)
+### 1. CoordinatorAgent (`aida/agents/coordination/`)
 
-The coordinator serves as the central brain of the system:
+The central orchestrator that manages task execution:
 
-- **Task Planning**: Creates execution plans from user requests
-- **Worker Management**: Tracks available workers and their capabilities
-- **Task Delegation**: Routes tasks to appropriate workers based on capabilities
-- **Progress Monitoring**: Tracks task execution and handles failures
-- **Plan Storage**: Persists plans for debugging and recovery
+**Key Responsibilities:**
+- **Planning**: Creates `TodoPlan` objects with steps and dependencies
+- **Worker Management**: Tracks workers via `WorkerProxy` objects
+- **Task Delegation**: Routes tasks using `TaskDispatcher` with capability matching
+- **Progress Monitoring**: Real-time tracking via A2A messages
+- **Storage**: Persists plans to `.aida/orchestrator/`
 
-Key features:
-- Deterministic planning for simple tasks
-- LLM-based planning for complex requests
-- Automatic retry with exponential backoff
-- Plan versioning and archival
+**Key Classes:**
+- `CoordinatorAgent`: Main coordinator implementation
+- `TodoPlan`: Plan representation with steps
+- `TaskDispatcher`: Intelligent task routing
+- `WorkerProxy`: Remote worker representation
+- `CoordinatorPlanStorage`: Plan persistence
 
 ### 2. Worker Agents (`aida/agents/worker/`)
 
-Specialized agents that execute specific types of tasks:
+Specialized agents that execute specific tasks:
 
-- **CodingWorker**: Code analysis, generation, refactoring, test generation
-- **ResearchWorker**: (Planned) Web search, documentation lookup
-- **DataWorker**: (Planned) Data analysis, visualization
+**Available Workers:**
+- **CodingWorker**: Code generation, analysis, refactoring, testing
+  - Capabilities: `code_generation`, `code_analysis`, `code_review`, `test_generation`
+  - MCP Integration: Uses filesystem server for file operations
 
-Workers features:
-- Auto-registration with coordinator
-- Capability-based task routing
-- Progress reporting
-- Sandboxed execution (Dagger containers)
-- MCP tool integration
+**Worker Features:**
+- Inherits from `WorkerAgent` base class
+- Auto-registration with coordinator via A2A
+- Progress reporting during task execution
+- MCP tool integration for enhanced capabilities
 
-### 3. Communication Protocol (A2A)
+### 3. Agent Communication (A2A Protocol)
 
-Agent-to-Agent (A2A) protocol built on WebSockets:
+Built on WebSockets for reliable agent communication:
 
-- Bidirectional message passing
-- Automatic reconnection
-- Message type routing
-- Health monitoring
+- **Message Types**: Registration, task assignment, progress updates, completion
+- **Automatic Reconnection**: Resilient to network issues
+- **Message Routing**: Type-based handler dispatch
+- **Health Monitoring**: Heartbeat and status tracking
 
 ## Architecture Flow
 
 ```
-User Request
-     │
-     ▼
-Coordinator Agent
-     │
-     ├─► Creates Plan (TodoPlan)
-     │   └─► Steps with dependencies
-     │
-     ├─► Discovers Workers
-     │   └─► Capability matching
-     │
-     └─► Delegates Tasks
-         │
-         ▼
-Worker Agents (parallel)
-     │
-     ├─► Execute in Sandbox
-     ├─► Use MCP Tools
-     └─► Report Progress
-         │
-         ▼
-Results Aggregation
+User Request → TodoOrchestrator (compatibility wrapper)
+                    ↓
+             CoordinatorAgent
+                    ↓
+            Creates TodoPlan
+                    ↓
+         TaskDispatcher finds workers
+                    ↓
+    WorkerProxy delegates to remote workers
+                    ↓
+         Workers execute tasks
+                    ↓
+      Results returned via A2A
 ```
 
-## MCP (Model Context Protocol) Integration
+## Creating New Workers
 
-Workers can use MCP servers for enhanced capabilities:
-
-### Filesystem Access
-```python
-# MCP filesystem server provides safe file operations
-result = await self._fs_client.execute_tool("read_file", {"path": file_path})
-
-# Response format:
-{
-  "content": [
-    {
-      "type": "text",
-      "text": "file contents here"
-    }
-  ]
-}
-```
-
-### Adding New MCP Servers
-1. Configure in `WorkerConfig.allowed_mcp_servers`
-2. Base agent automatically initializes connections
-3. Access via `self.mcp_clients[server_name]`
-
-## Creating a New Worker
-
-### 1. Define the Worker Class
+### 1. Implement Worker Class
 
 ```python
 from aida.agents.base import WorkerAgent, WorkerConfig
 
 class MyWorker(WorkerAgent):
-    """Worker for specific tasks."""
+    """Custom worker implementation."""
 
-    def __init__(self, worker_id: str, config: Optional[WorkerConfig] = None):
-        if config is None:
-            config = WorkerConfig(
-                agent_id=worker_id,
-                agent_type="my_worker",
-                capabilities=["capability1", "capability2"],
-                allowed_mcp_servers=["filesystem"],  # Optional
-            )
+    def __init__(self, worker_id: str):
+        config = WorkerConfig(
+            agent_id=worker_id,
+            agent_type="my_worker",
+            capabilities=["my_capability"],
+            allowed_mcp_servers=["filesystem"]  # Optional MCP servers
+        )
         super().__init__(config)
 
-    async def execute_task_logic(self, task_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Implement task execution."""
+    async def execute_task(self, task_data: dict[str, Any]) -> dict[str, Any]:
+        """Execute assigned task."""
         capability = task_data["capability"]
-        parameters = task_data["parameters"]
+        parameters = task_data.get("parameters", {})
 
-        # Task implementation
-        if capability == "capability1":
-            result = await self._do_capability1(parameters)
-
-        return result
+        if capability == "my_capability":
+            # Implement task logic
+            result = await self._do_work(parameters)
+            return {"status": "completed", "result": result}
 ```
 
-### 2. Register Worker Capabilities
+### 2. Task Execution
 
-Workers automatically register their capabilities with the coordinator on startup.
-
-### 3. Handle Task Assignment
-
-The coordinator will route tasks based on capabilities:
-
+Workers receive tasks with this structure:
 ```python
-# Coordinator finds workers
-workers = self._get_workers_for_capability("capability1")
-
-# Selects best worker (load balancing, performance metrics)
-worker = self._select_best_worker(workers)
-
-# Delegates task
-await self._delegate_to_worker(worker_id, task_data)
+{
+    "capability": "code_generation",
+    "parameters": {
+        "specification": "Create a fibonacci function",
+        "language": "python"
+    },
+    "timeout": 300.0
+}
 ```
 
-## Testing
-
-### Integration Tests
+### 3. Progress Reporting
 
 ```python
-# See aida/agents/tests/test_coordinator_worker_improved.py
+async def execute_task(self, task_data):
+    # Report progress during execution
+    await self.report_progress(0.25, "Starting analysis")
+    # ... do work ...
+    await self.report_progress(0.75, "Generating output")
+    # ... finish ...
+    return result
+```
 
-async def test_worker_integration():
-    # 1. Start coordinator
+## MCP Integration
+
+Workers can use MCP servers for enhanced capabilities:
+
+```python
+# In worker initialization
+self.mcp_executor = MCPExecutor()
+await self.mcp_executor.initialize_server("filesystem", {
+    "allowed_directories": ["/path/to/workspace"]
+})
+
+# Using MCP tools
+result = await self.mcp_executor.execute_tool(
+    "filesystem",
+    "read_file",
+    {"path": "example.py"}
+)
+```
+
+## Plan Storage
+
+Plans are stored in `.aida/orchestrator/`:
+- `active/`: Currently executing plans
+- `archived/`: Completed plans (auto-archived)
+- `failed/`: Failed plans for debugging
+
+Plan files contain:
+- User request and context
+- Generated steps with dependencies
+- Execution status and results
+- Timing and performance data
+
+## Testing Workers
+
+```python
+# Integration test example
+async def test_worker():
+    # 1. Create coordinator
     coordinator = CoordinatorAgent(config)
     await coordinator.start()
 
-    # 2. Start worker
-    worker = CodingWorker("worker1", config)
+    # 2. Create and start worker
+    worker = MyWorker("test_worker")
     await worker.start()
 
-    # 3. Wait for registration
-    await asyncio.sleep(2)
+    # 3. Execute request through coordinator
+    result = await coordinator.execute_request(
+        "Do something with my capability"
+    )
 
-    # 4. Submit task
-    response = await coordinator.execute_request({
-        "task_type": "code_analysis",
-        "file_path": "example.py"
-    })
-
-    # 5. Check results
-    assert response["status"] == "completed"
+    assert result["status"] == "completed"
 ```
-
-### Test Utilities
-
-- `TestResult`: Assertion tracking with detailed error messages
-- Plan storage verification
-- Worker registration checks
-- Error handling validation
 
 ## Configuration
 
 ### Coordinator Configuration
-
 ```python
-from aida.agents.coordination.models import CoordinatorConfig
-
-config = CoordinatorConfig(
-    agent_id="coordinator_001",
-    planning_timeout=30.0,
-    execution_timeout=300.0,
-    max_retries=3,
-    storage_path=".aida/coordinator/plans"
+config = AgentConfig(
+    agent_id="coordinator",
+    agent_type="coordinator",
+    capabilities=["planning", "task_delegation"],
+    storage_dir=".aida/orchestrator"  # Plan storage location
 )
 ```
 
 ### Worker Configuration
-
 ```python
-from aida.agents.base import WorkerConfig, SandboxConfig
-
 config = WorkerConfig(
     agent_id="worker_001",
     agent_type="coding_worker",
-    capabilities=["code_analysis", "code_generation"],
+    capabilities=["code_generation", "code_analysis"],
     max_concurrent_tasks=3,
-    allowed_mcp_servers=["filesystem"],
-    sandbox_config=SandboxConfig(
-        isolation_level=SandboxIsolationLevel.CONTAINER,
-        resource_limits=ResourceLimits(cpu_cores=2, memory_mb=1024)
-    )
+    allowed_mcp_servers=["filesystem", "searxng"]
 )
 ```
 
-## Debugging
+## TodoOrchestrator (Compatibility Layer)
 
-### Plan Storage
+The `TodoOrchestrator` in `aida/core/orchestrator/` provides backward compatibility:
 
-Plans are stored in `.aida/coordinator/plans/`:
-- `active/`: Currently executing plans
-- `archived/`: Successfully completed plans
-- `failed/`: Failed plans for debugging
+```python
+from aida.core.orchestrator import get_orchestrator
 
-### Viewing Plans
+# Get singleton instance
+orchestrator = get_orchestrator()
 
-```bash
-# List all plans
-ls -la .aida/coordinator/plans/archived/
-
-# View specific plan
-cat .aida/coordinator/plans/archived/plan_0001_*.json | jq
+# Execute request (creates plan and manages execution)
+result = await orchestrator.execute_request("Create a hello world function")
 ```
 
-### Common Issues
-
-1. **"No code provided for analysis"**
-   - Check MCP filesystem connection
-   - Verify file exists and is readable
-   - Check response parsing for content extraction
-
-2. **Worker not found**
-   - Ensure worker started and registered
-   - Check capability names match exactly
-   - Verify A2A connection established
-
-3. **Task timeout**
-   - Increase timeout in configuration
-   - Check worker health/performance
-   - Review task complexity
+This wrapper:
+- Creates and manages a CoordinatorAgent instance
+- Provides a simplified API for single requests
+- Maintains storage in `.aida/orchestrator/`
+- Auto-creates a default CodingWorker
 
 ## Best Practices
 
 1. **Capability Design**
-   - Keep capabilities focused and specific
-   - Use clear, descriptive names
+   - Use specific, descriptive capability names
+   - One capability = one well-defined task type
    - Document required parameters
 
 2. **Error Handling**
-   - Always return structured errors
-   - Include context in error messages
+   - Return structured error responses
+   - Include context for debugging
    - Let coordinator handle retries
 
-3. **Progress Reporting**
-   - Report progress at meaningful intervals
-   - Include descriptive status messages
-   - Update at 10%, 30%, 60%, 90%
-
-4. **Resource Management**
-   - Configure appropriate sandbox limits
-   - Clean up temporary resources
+3. **Resource Management**
+   - Clean up temporary files
    - Handle cancellation gracefully
+   - Respect timeout limits
 
-## Available Workers
+4. **Testing**
+   - Test workers in isolation
+   - Use integration tests for full flow
+   - Verify plan storage and retrieval
 
-### CodingWorker
-Handles code-related tasks through MCP filesystem integration:
-- **code_analysis**: Analyzes code structure, complexity, and quality
-- **code_generation**: Generates code based on specifications
-- **code_review**: Reviews code for best practices and issues
-- **refactoring**: Suggests and implements code improvements
+## Debugging
 
-## Future Enhancements
+### Common Issues
 
-1. **Dynamic Worker Scaling**
-   - Auto-spawn workers based on load
-   - Cloud-based worker pools
-   - Resource-aware scheduling
+1. **Worker Not Found**
+   - Check worker started successfully
+   - Verify capability names match
+   - Ensure A2A connection established
 
-2. **Advanced Planning**
-   - Multi-step dependency resolution
-   - Parallel execution optimization
-   - Cost-aware planning
+2. **Task Timeout**
+   - Increase timeout in task data
+   - Check for blocking operations
+   - Add progress reporting
 
-3. **Enhanced Observability**
-   - OpenTelemetry integration
-   - Distributed tracing
-   - Performance metrics dashboard
+3. **Plan Storage Issues**
+   - Verify storage directory exists
+   - Check file permissions
+   - Monitor disk space
+
+### Useful Commands
+
+```bash
+# View active plans
+ls -la .aida/orchestrator/active/
+
+# Monitor plan execution
+tail -f .aida/logs/coordinator.log
+
+# Check worker registration
+grep "Worker registered" .aida/logs/coordinator.log
+```

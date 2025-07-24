@@ -10,7 +10,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
-from typing import Any
+from typing import Any, cast
 
 from aida.core.mcp_executor import MCPExecutor
 
@@ -21,6 +21,11 @@ class MockMCPFilesystemClient:
     """Mock MCP client for testing without real MCP server."""
 
     def __init__(self, allowed_directories: list[str]):
+        """Initialize the mock MCP filesystem client.
+
+        Args:
+            allowed_directories: List of directories the client can access
+        """
         self.allowed_directories = allowed_directories
 
     async def execute_tool(self, tool_name: str, args: dict[str, Any]) -> dict[str, Any]:
@@ -356,7 +361,7 @@ class FilesystemMCPServer:
 
         try:
             # Install the package
-            result = subprocess.run(
+            subprocess.run(
                 ["npm", "install", "@modelcontextprotocol/server-filesystem"],
                 capture_output=True,
                 text=True,
@@ -415,7 +420,7 @@ async def get_filesystem_server(
         _filesystem_server = FilesystemMCPServer(allowed_directories)
         await _filesystem_server.start(use_mock=use_mock)
 
-    return _filesystem_server
+    return cast(FilesystemMCPServer, _filesystem_server)
 
 
 async def stop_filesystem_server() -> None:

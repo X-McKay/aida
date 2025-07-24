@@ -314,7 +314,6 @@ async def test_code_generation(coordinator: CoordinatorAgent, result: TestResult
         result.assert_not_none(plan, "Plan loaded successfully")
 
         if plan:
-            progress = plan.get_progress()
             result.assert_equal(plan.status, "completed", "Plan completed successfully")
 
             if plan.steps and plan.steps[0].result:

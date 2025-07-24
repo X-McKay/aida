@@ -1,7 +1,7 @@
 """Models for coordinator planning and execution.
 
-These models were extracted from the legacy orchestrator system
-and are now used by the coordinator-worker agent framework.
+Core data models for representing execution plans, steps, and status
+in the coordinator-worker architecture.
 """
 
 from datetime import datetime

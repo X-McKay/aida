@@ -34,7 +34,7 @@ class TestTUI:
         """Test tasks widget creation."""
         widget = TasksWidget()
         assert widget is not None
-        assert len(widget.tasks) == 0
+        assert len(widget.plans) == 0
 
     def test_agents_widget_creation(self):
         """Test agents widget creation."""
@@ -71,24 +71,24 @@ class TestTUI:
         widget = TasksWidget()
 
         # Direct data manipulation (without UI refresh)
-        widget.tasks["task_001"] = {"description": "Test task", "status": "pending"}
-        assert len(widget.tasks) == 1
-        assert widget.tasks["task_001"]["description"] == "Test task"
-        assert widget.tasks["task_001"]["status"] == "pending"
+        widget.plans["task_001"] = {"description": "Test task", "status": "pending"}
+        assert len(widget.plans) == 1
+        assert widget.plans["task_001"]["description"] == "Test task"
+        assert widget.plans["task_001"]["status"] == "pending"
 
         # Update task status
-        widget.tasks["task_001"]["status"] = "running"
-        assert widget.tasks["task_001"]["status"] == "running"
+        widget.plans["task_001"]["status"] = "running"
+        assert widget.plans["task_001"]["status"] == "running"
 
-        # Get active task count
-        count = widget.get_active_task_count()
+        # Get active plan count
+        count = widget.get_active_plan_count()
         assert count == 1
 
         # Complete task
-        widget.tasks["task_001"]["status"] = "completed"
-        count = widget.get_active_task_count()
+        widget.plans["task_001"]["status"] = "completed"
+        count = widget.get_active_plan_count()
         assert count == 0
 
         # Remove task
-        del widget.tasks["task_001"]
-        assert len(widget.tasks) == 0
+        del widget.plans["task_001"]
+        assert len(widget.plans) == 0

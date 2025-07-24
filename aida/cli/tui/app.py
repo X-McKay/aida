@@ -57,7 +57,7 @@ class AIDATui(App):
         height: 100%;
         border: solid $primary;
         border-title-color: $primary;
-        border-title-background: $surface;
+        /* border-title-background: $surface; */
         border-title-align: center;
         padding: 1;
         background: $panel;
@@ -67,9 +67,9 @@ class AIDATui(App):
         height: 33%;
         border: solid $primary;
         border-title-color: $primary;
-        border-title-background: $surface;
+        /* border-title-background: $surface; */
         border-title-align: center;
-        padding: 1;
+        padding: 0 1;
         margin-bottom: 1;
         background: $panel;
     }
@@ -78,7 +78,7 @@ class AIDATui(App):
         height: 33%;
         border: solid $primary;
         border-title-color: $primary;
-        border-title-background: $surface;
+        /* border-title-background: $surface; */
         border-title-align: center;
         padding: 1;
         margin-bottom: 1;
@@ -89,7 +89,7 @@ class AIDATui(App):
         height: 33%;
         border: solid $primary;
         border-title-color: $primary;
-        border-title-background: $surface;
+        /* border-title-background: $surface; */
         border-title-align: center;
         padding: 1;
         background: $panel;
@@ -133,7 +133,7 @@ class AIDATui(App):
 
                 # Ongoing tasks (middle third)
                 tasks_container = Container(id="tasks-widget")
-                tasks_container.border_title = "Ongoing Tasks"
+                tasks_container.border_title = "Active Tasks"
                 self.tasks_widget = TasksWidget()
                 yield tasks_container
 

@@ -349,20 +349,18 @@ class BaseAgent(ABC):
         )
         await self.send_message(response)
 
-    async def _on_start(self) -> None:
+    async def _on_start(self) -> None:  # noqa: B027
         """Hook for subclasses to perform additional initialization.
 
         Called after core components are initialized but before
         the agent is marked as running.
         """
-        pass
 
-    async def _on_stop(self) -> None:
+    async def _on_stop(self) -> None:  # noqa: B027
         """Hook for subclasses to perform cleanup.
 
         Called before core components are shut down.
         """
-        pass
 
     def create_response(
         self, original_message: A2AMessage, payload: dict[str, Any], message_type: str = "response"

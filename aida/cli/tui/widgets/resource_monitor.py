@@ -2,6 +2,7 @@
 
 import asyncio
 from collections import deque
+import os
 import secrets
 
 import psutil
@@ -21,17 +22,18 @@ class ResourceMonitor(Widget):
         width: 100%;
     }
 
-    .resource-chart {
+    #resource-display {
         height: 100%;
         width: 100%;
-        padding: 1;
+        padding: 0;
+        margin: 0;
     }
     """
 
     # Reactive data for charts
-    cpu_history: reactive[deque[float]] = reactive(lambda: deque(maxlen=50))
-    memory_history: reactive[deque[float]] = reactive(lambda: deque(maxlen=50))
-    gpu_history: reactive[deque[float]] = reactive(lambda: deque(maxlen=50))
+    cpu_history: reactive[deque[float]] = reactive(deque(maxlen=50))
+    memory_history: reactive[deque[float]] = reactive(deque(maxlen=50))
+    gpu_history: reactive[deque[float]] = reactive(deque(maxlen=50))
 
     def __init__(self):
         """Initialize the resource monitor."""
@@ -46,7 +48,7 @@ class ResourceMonitor(Widget):
 
     def compose(self) -> ComposeResult:
         """Create the resource monitor UI."""
-        yield Static("", classes="resource-chart", id="resource-display")
+        yield Static("", classes="resource-chart", id="resource-display", expand=True)
 
     async def start_monitoring(self) -> None:
         """Start monitoring system resources."""
@@ -57,7 +59,7 @@ class ResourceMonitor(Widget):
 
     async def _update_resources(self) -> None:
         """Update resource usage data."""
-        # Get CPU usage
+        # Get CPU usage with real data
         cpu_percent = psutil.cpu_percent(interval=0.1)
         self.cpu_history.append(cpu_percent)
 
@@ -70,19 +72,31 @@ class ResourceMonitor(Widget):
         try:
             # This would require nvidia-ml-py or similar for real GPU monitoring
             # For now, check if we can detect GPU
+            import re
             import subprocess
 
-            # IMPORTANT: Redirect all output to DEVNULL to prevent stdout pollution
+            # Create isolated environment to prevent terminal control sequences
+            clean_env = os.environ.copy()
+            clean_env["TERM"] = "dumb"
+            clean_env["NO_COLOR"] = "1"
+
+            # IMPORTANT: Redirect all output and use isolated environment
             result = subprocess.run(
                 ["nvidia-smi", "--query-gpu=utilization.gpu", "--format=csv,noheader,nounits"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,  # Close stdin to prevent any interaction
                 text=True,
                 timeout=1,
+                check=False,  # Don't raise exception on non-zero return code
+                env=clean_env,  # Use clean environment
             )
             if result.returncode == 0 and result.stdout:
                 try:
-                    gpu_percent = float(result.stdout.strip())
+                    # Strip any escape sequences that might have leaked through
+                    clean_output = re.sub(r"\x1b\[[0-9;]*m", "", result.stdout)
+                    clean_output = clean_output.strip()
+                    gpu_percent = float(clean_output)
                 except ValueError:
                     # Failed to parse, use simulation
                     gpu_percent = secrets.randbelow(61) + 20 if len(self.gpu_history) > 0 else 30
@@ -96,25 +110,34 @@ class ResourceMonitor(Widget):
         self.gpu_history.append(gpu_percent)
 
         # Update display
-        self.refresh()
+        self._update_display()
 
-    def render_line_chart(
-        self, data: list[float], height: int = 6, width: int = 40, color: str = "green"
-    ) -> list[str]:
-        """Render a smooth ASCII line chart similar to dolphie style."""
-        if not data:
-            return [" " * width for _ in range(height)]
+    def render_combined_chart(
+        self,
+        cpu_data: list[float],
+        mem_data: list[float],
+        gpu_data: list[float],
+        height: int = 12,
+        width: int = 50,
+    ) -> list[tuple[str, str]]:
+        """Render a combined chart with three lines for CPU, Memory, and GPU."""
+        if not cpu_data and not mem_data and not gpu_data:
+            return [(" " * (width + 5), "white") for _ in range(height)]
 
-        # Always use 0-100 range for percentages
         # Create chart with axis
         chart = [[" " for _ in range(width + 5)] for _ in range(height)]
+        colors = [["white" for _ in range(width + 5)] for _ in range(height)]
 
-        # Add Y-axis labels (100%, 50%, 0%)
+        # Add Y-axis labels (100%, 75%, 50%, 25%, 0%)
         for y in range(height):
             if y == 0:
                 chart[y][0:4] = list("100%")
+            elif y == height // 4:
+                chart[y][0:4] = list(" 75%")
             elif y == height // 2:
                 chart[y][0:4] = list(" 50%")
+            elif y == 3 * height // 4:
+                chart[y][0:4] = list(" 25%")
             elif y == height - 1:
                 chart[y][0:4] = list("  0%")
             else:
@@ -122,49 +145,38 @@ class ResourceMonitor(Widget):
 
             # Add axis line
             chart[y][4] = "│"
+            colors[y][4] = "dim"
 
-        # Get data points for width
-        points = list(data)[-width:]
+        # Draw each data series
+        datasets = [
+            (cpu_data, "●", "cyan"),  # CPU - filled circle
+            (mem_data, "●", "blue"),  # Memory - filled circle
+            (gpu_data, "●", "yellow"),  # GPU - filled circle
+        ]
 
-        # Draw line chart using Unicode box drawing characters
-        for i in range(len(points)):
-            if i < width:
-                val = points[i]
+        for data, symbol, color in datasets:
+            points = list(data)[-width:]
 
-                # Normalize to chart height
-                y = int((1 - val / 100) * (height - 1))
-                y = max(0, min(height - 1, y))
+            for i in range(len(points)):
+                if i < width:
+                    val = points[i]
 
-                # Plot point
-                chart[y][i + 5] = "•"
+                    # Normalize to chart height
+                    y = int((1 - val / 100) * (height - 1))
+                    y = max(0, min(height - 1, y))
 
-                # Connect to previous point if exists
-                if i > 0:
-                    prev_val = points[i - 1]
-                    prev_y = int((1 - prev_val / 100) * (height - 1))
-                    prev_y = max(0, min(height - 1, prev_y))
+                    # Plot point only if space is available
+                    if chart[y][i + 5] == " ":
+                        chart[y][i + 5] = symbol
+                        colors[y][i + 5] = color
 
-                    # Draw connecting line using appropriate characters
-                    if y != prev_y:
-                        if y > prev_y:
-                            # Line going down
-                            for dy in range(prev_y + 1, y):
-                                chart[dy][i + 5] = "│"
-                            chart[prev_y][i + 5] = "╮" if chart[prev_y][i + 5] == " " else "•"
-                            chart[y][i + 5] = "╯" if i < len(points) - 1 else "•"
-                        else:
-                            # Line going up
-                            for dy in range(y + 1, prev_y):
-                                chart[dy][i + 5] = "│"
-                            chart[prev_y][i + 5] = "╰" if chart[prev_y][i + 5] == " " else "•"
-                            chart[y][i + 5] = "╭" if i < len(points) - 1 else "•"
-                    else:
-                        # Horizontal line
-                        if i > 0 and chart[y][i + 4] == " ":
-                            chart[y][i + 4] = "─"
+        # Convert to list of tuples (line, color_info)
+        result = []
+        for y in range(height):
+            line = "".join(chart[y])
+            result.append((line, colors[y]))
 
-        # Convert to strings
-        return ["".join(row) for row in chart]
+        return result
 
     def render(self) -> Text:
         """Render the resource monitor."""
@@ -175,61 +187,66 @@ class ResourceMonitor(Widget):
         mem_current = self.memory_history[-1] if self.memory_history else 0
         gpu_current = self.gpu_history[-1] if self.gpu_history else 0
 
-        # Render charts with appropriate width
-        width = 30  # Adjust based on panel width
-        height = 5  # Height for each chart
+        # Get available space - account for padding and borders
+        container_width = self.size.width
+        container_height = self.size.height
 
-        # Render all three charts
-        cpu_chart = self.render_line_chart(list(self.cpu_history), height=height, width=width)
-        mem_chart = self.render_line_chart(list(self.memory_history), height=height, width=width)
-        gpu_chart = self.render_line_chart(list(self.gpu_history), height=height, width=width)
+        # Calculate dynamic dimensions - use most of the width
+        width = max(40, container_width - 8)  # Leave room for labels and axis only
+        # Use most of the height for the combined chart
+        height = max(10, container_height - 8)
 
-        # Time axis (showing relative time markers)
-        time_axis = "     └" + "─" * width + "┘"
-        time_labels = (
-            "      -50s" + " " * (width // 2 - 8) + "-25s" + " " * (width // 2 - 6) + "now"
+        # Title and legend
+        output.append("System Resources\n", style="bold white")
+        output.append("\n")
+
+        # Legend with current values
+        output.append("  ● CPU: ", style="cyan")
+        output.append(f"{cpu_current:>3.0f}%", style="bright_cyan")
+        output.append("   ● MEM: ", style="blue")
+        output.append(f"{mem_current:>3.0f}%", style="bright_blue")
+        output.append("   ● GPU: ", style="yellow")
+        output.append(f"{gpu_current:>3.0f}%\n", style="bright_yellow")
+        output.append("\n")
+
+        # Render combined chart
+        chart_lines = self.render_combined_chart(
+            list(self.cpu_history),
+            list(self.memory_history),
+            list(self.gpu_history),
+            height=height,
+            width=width,
         )
 
-        # CPU section
-        output.append("  CPU: ", style="bold cyan")
-        output.append(f"{cpu_current:>3.0f}%\n", style="bright_cyan")
-
-        for _i, line in enumerate(cpu_chart):
-            output.append(line, style="cyan")
+        # Display chart with proper colors
+        for line, color_info in chart_lines:
+            # Apply colors character by character
+            for i, char in enumerate(line):
+                if i < len(color_info):
+                    color = color_info[i]
+                    output.append(char, style=color)
+                else:
+                    output.append(char)
             output.append("\n")
 
-        output.append(time_axis + "\n", style="dim")
-        output.append(time_labels + "\n", style="dim")
-
-        # Memory section
-        output.append("\n  MEM: ", style="bold blue")
-        output.append(f"{mem_current:>3.0f}%\n", style="bright_blue")
-
-        for _i, line in enumerate(mem_chart):
-            output.append(line, style="blue")
-            output.append("\n")
-
-        output.append(time_axis + "\n", style="dim")
-        output.append(time_labels + "\n", style="dim")
-
-        # GPU section
-        output.append("\n  GPU: ", style="bold yellow")
-        output.append(f"{gpu_current:>3.0f}%\n", style="bright_yellow")
-
-        for _i, line in enumerate(gpu_chart):
-            output.append(line, style="yellow")
-            output.append("\n")
-
-        output.append(time_axis, style="dim")
-        output.append("\n")
-        output.append(time_labels, style="dim")
+        # Time axis
+        output.append("     └" + "─" * width + "┘\n", style="dim")
+        output.append(
+            "      -50s" + " " * (width // 2 - 8) + "-25s" + " " * (width // 2 - 6) + "now",
+            style="dim",
+        )
 
         return output
 
+    def _update_display(self) -> None:
+        """Update the display content."""
+        static_widget = self.query_one("#resource-display", Static)
+        static_widget.update(self.render())
+
     def on_mount(self) -> None:
         """Set up the widget when mounted."""
-        # Update display periodically
-        self.set_interval(1.0, self.refresh)
+        # Initial render
+        self._update_display()
 
     def on_unmount(self) -> None:
         """Clean up when unmounting."""
