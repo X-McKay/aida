@@ -75,7 +75,9 @@ if __name__ == "__main__":
 EOF
 
     # Run the server in background
-    nohup $PYTHON_CMD "$MCP_LOG_DIR/${server_name}_runner.py" $extra_args > "$log_file" 2>&1 &
+    # shellcheck disable=SC2086
+    # extra_args is intentionally unquoted to allow multiple arguments
+    nohup "$PYTHON_CMD" "$MCP_LOG_DIR/${server_name}_runner.py" $extra_args > "$log_file" 2>&1 &
     local pid=$!
 
     # Save PID
@@ -84,7 +86,7 @@ EOF
     # Wait a moment to check if it started successfully
     sleep 2
 
-    if kill -0 $pid 2>/dev/null; then
+    if kill -0 "$pid" 2>/dev/null; then
         echo -e "${GREEN}  ✓ $server_name started successfully (PID: $pid)${NC}"
         echo -e "  Log: $log_file"
     else
@@ -178,18 +180,18 @@ echo "Summary:"
 echo "--------"
 
 # Count running servers
-running_count=$(ls -1 "$MCP_PID_DIR"/*.pid 2>/dev/null | wc -l)
+running_count=$(find "$MCP_PID_DIR" -name "*.pid" -type f 2>/dev/null | wc -l)
 echo -e "Running MCP Servers: ${GREEN}$running_count${NC}"
 
 # List running servers
-if [ $running_count -gt 0 ]; then
+if [ "$running_count" -gt 0 ]; then
     echo
     echo "Active servers:"
     for pid_file in "$MCP_PID_DIR"/*.pid; do
         if [ -f "$pid_file" ]; then
             server_name=$(basename "$pid_file" .pid)
             pid=$(cat "$pid_file")
-            if kill -0 $pid 2>/dev/null; then
+            if kill -0 "$pid" 2>/dev/null; then
                 echo -e "  - ${GREEN}$server_name${NC} (PID: $pid)"
             fi
         fi
@@ -210,9 +212,9 @@ if [ "$1" = "stop" ]; then
         if [ -f "$pid_file" ]; then
             server_name=$(basename "$pid_file" .pid)
             pid=$(cat "$pid_file")
-            if kill -0 $pid 2>/dev/null; then
+            if kill -0 "$pid" 2>/dev/null; then
                 echo -e "  Stopping $server_name (PID: $pid)..."
-                kill $pid
+                kill "$pid"
                 rm "$pid_file"
             fi
         fi
@@ -229,7 +231,7 @@ if [ "$1" = "status" ]; then
         if [ -f "$pid_file" ]; then
             server_name=$(basename "$pid_file" .pid)
             pid=$(cat "$pid_file")
-            if kill -0 $pid 2>/dev/null; then
+            if kill -0 "$pid" 2>/dev/null; then
                 echo -e "  ${GREEN}✓${NC} $server_name (PID: $pid) - Running"
             else
                 echo -e "  ${RED}✗${NC} $server_name (PID: $pid) - Not running"
