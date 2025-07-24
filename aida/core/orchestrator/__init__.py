@@ -8,7 +8,7 @@ TODO: Update all code to use the new agent system directly and remove this.
 
 import asyncio
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -34,9 +34,6 @@ class TodoOrchestrator:
 
     def __init__(self, storage_dir: str | None = None):
         """Initialize compatibility wrapper."""
-        from aida.agents.coordination.coordinator_agent import CoordinatorAgent
-        from aida.agents.worker.coding_worker import CodingWorker
-
         self.storage_dir = storage_dir or ".aida/orchestrator"
         self.coordinator = None
         self.worker = None
@@ -45,13 +42,20 @@ class TodoOrchestrator:
     async def _ensure_initialized(self):
         """Ensure coordinator and worker are initialized."""
         if not self._initialized:
+            from aida.agents.base import AgentConfig
             from aida.agents.coordination.coordinator_agent import CoordinatorAgent
-            from aida.agents.coordination.models import CoordinatorConfig
+            from aida.agents.coordination.storage import CoordinatorPlanStorage
             from aida.agents.worker.coding_worker import CodingWorker
 
             # Create coordinator with storage path
-            config = CoordinatorConfig(agent_id="legacy_coordinator", storage_path=self.storage_dir)
+            config = AgentConfig(
+                agent_id="legacy_coordinator",
+                agent_type="coordinator",
+                capabilities=["planning", "task_delegation", "agent_coordination"],
+            )
             self.coordinator = CoordinatorAgent(config=config)
+            # Set storage directory directly on the coordinator's storage
+            self.coordinator._storage = CoordinatorPlanStorage(self.storage_dir)
             await self.coordinator.start()
 
             # Create a default worker
@@ -72,19 +76,39 @@ class TodoOrchestrator:
         if isinstance(request, str):
             user_request = request
             context = context or {}
-            return await self.coordinator.execute_user_request(user_request, context)
+
+            try:
+                # Create plan from user request
+                plan = await self.coordinator.create_plan(user_request, context)
+
+                # Execute the plan
+                result = await self.coordinator.execute_plan(plan)
+
+                # Return formatted result
+                return {
+                    "status": "completed",
+                    "plan": plan,
+                    "result": result,
+                    "message": result.get("summary", "Task completed successfully"),
+                }
+            except Exception as e:
+                logger.error(f"Request execution failed: {e}")
+                return {
+                    "status": "failed",
+                    "error": str(e),
+                    "message": f"Failed to execute request: {e}",
+                }
 
         # Handle dict request (legacy format)
         if isinstance(request, dict):
-            # Convert old request format if needed
-            if "prompt" in request and "task_type" not in request:
-                # Old format - convert to new
-                request = {
-                    "task_type": "code_generation",
-                    "specification": request["prompt"],
-                    "context": request.get("context", {}),
-                }
-            return await self.coordinator.execute_request(request)
+            # Convert old request format to string if needed
+            if "prompt" in request:
+                return await self.execute_request(request["prompt"], request.get("context", {}))
+
+            # Try to extract a user request string
+            user_request = request.get("user_request") or request.get("specification", "")
+            if user_request:
+                return await self.execute_request(user_request, request.get("context", {}))
 
         raise ValueError(f"Invalid request type: {type(request)}")
 

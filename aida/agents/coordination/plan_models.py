@@ -31,6 +31,7 @@ class ReplanReason(str, Enum):
     RESOURCE_UNAVAILABLE = "resource_unavailable"
     TIMEOUT = "timeout"
     ERROR = "error"
+    PERIODIC_CHECK = "periodic_check"
 
 
 class TodoStep(BaseModel):
@@ -89,6 +90,8 @@ class TodoPlan(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     last_updated: datetime = Field(default_factory=datetime.utcnow)
     plan_version: int = 1
+    last_evaluated: datetime = Field(default_factory=datetime.utcnow)
+    replan_history: list[dict[str, Any]] = Field(default_factory=list)
 
     @property
     def status(self) -> str:
