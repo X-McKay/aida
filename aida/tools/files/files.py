@@ -1,38 +1,57 @@
-"""Main file operations tool implementation."""
+"""File operations tool using MCP filesystem server."""
 
-from collections.abc import Callable
 from datetime import datetime
 import logging
-from pathlib import Path
-import re
-import shutil
 from typing import Any
 import uuid
 
+from aida.providers.mcp.filesystem_client import MCPFilesystemClient
 from aida.tools.base import ToolCapability, ToolParameter, ToolResult, ToolStatus
 from aida.tools.base_tool import BaseModularTool
 
 from .config import FilesConfig
-from .models import FileInfo, FileOperation, FileOperationRequest, FileOperationResponse
+from .models import FileOperation, FileOperationRequest, FileOperationResponse
 
 logger = logging.getLogger(__name__)
 
 
 class FileOperationsTool(BaseModularTool[FileOperationRequest, FileOperationResponse, FilesConfig]):
-    """Tool for comprehensive file and directory operations."""
+    """File operations tool using official MCP filesystem server."""
 
-    def __init__(self):
-        """Initialize the FileOperationsTool."""
+    def __init__(self, allowed_directories: list[str] | None = None):
+        """Initialize file operations tool.
+
+        Args:
+            allowed_directories: List of directories the MCP server can access.
+                               If None, uses configured safe paths.
+        """
         super().__init__()
+
+        # Use configured safe paths if no directories specified
+        if allowed_directories is None:
+            allowed_directories = list(FilesConfig.ALLOWED_BASE_PATHS)
+
+        self.allowed_directories = allowed_directories
+        self._client = None
+        self._initialized = False
+
+    async def _ensure_initialized(self):
+        """Ensure MCP client is initialized and connected."""
+        if not self._initialized:
+            self._client = MCPFilesystemClient(self.allowed_directories)
+            if await self._client.connect():
+                self._initialized = True
+            else:
+                raise RuntimeError("Failed to connect to MCP filesystem server")
 
     def _get_tool_name(self) -> str:
         return "file_operations"
 
     def _get_tool_version(self) -> str:
-        return "2.0.0"
+        return "3.0.0"  # Major version bump for MCP integration
 
     def _get_tool_description(self) -> str:
-        return "Comprehensive file and directory operations with search and editing capabilities"
+        return "File operations using official MCP filesystem server"
 
     def _get_default_config(self):
         return FilesConfig
@@ -57,29 +76,23 @@ class FileOperationsTool(BaseModularTool[FileOperationRequest, FileOperationResp
                 ToolParameter(
                     name="content",
                     type="str",
-                    description="Content for write/append operations",
+                    description="Content for write operations",
                     required=False,
                 ),
                 ToolParameter(
                     name="destination",
                     type="str",
-                    description="Destination path for copy/move",
+                    description="Destination path for move",
                     required=False,
                 ),
                 ToolParameter(
                     name="pattern",
                     type="str",
-                    description="Search pattern (regex or glob)",
+                    description="Search pattern (glob)",
                     required=False,
                 ),
                 ToolParameter(
                     name="search_text", type="str", description="Text to search for", required=False
-                ),
-                ToolParameter(
-                    name="replace_text",
-                    type="str",
-                    description="Text to replace with",
-                    required=False,
                 ),
                 ToolParameter(
                     name="recursive",
@@ -88,22 +101,18 @@ class FileOperationsTool(BaseModularTool[FileOperationRequest, FileOperationResp
                     required=False,
                     default=False,
                 ),
-                ToolParameter(
-                    name="encoding",
-                    type="str",
-                    description="File encoding",
-                    required=False,
-                    default="utf-8",
-                ),
             ],
         )
 
     async def execute(self, **kwargs) -> ToolResult:
-        """Execute file operation."""
+        """Execute file operation using MCP filesystem server."""
         start_time = datetime.utcnow()
 
         try:
-            # Ensure operation is provided
+            # Ensure MCP client is connected
+            await self._ensure_initialized()
+
+            # Validate operation
             if "operation" not in kwargs:
                 return ToolResult(
                     tool_name=self.name,
@@ -118,14 +127,54 @@ class FileOperationsTool(BaseModularTool[FileOperationRequest, FileOperationResp
             # Create request model
             request = FileOperationRequest(**kwargs)  # ty: ignore[missing-argument]
 
-            # Check path safety
-            if not FilesConfig.is_safe_path(request.path):
-                raise ValueError(f"Access denied: {request.path} is not in allowed paths")
+            # Map operations to MCP tool names
+            operation_map = {
+                FileOperation.READ: "read_file",
+                FileOperation.WRITE: "write_file",
+                FileOperation.DELETE: "delete_file",
+                FileOperation.MOVE: "move_file",
+                FileOperation.CREATE_DIR: "create_directory",
+                FileOperation.LIST_DIR: "list_directory",
+                FileOperation.GET_INFO: "get_file_info",
+                FileOperation.EDIT: "edit_file",
+            }
 
-            # Route to appropriate operation
-            response = await self._route_operation(request)
+            mcp_tool = operation_map.get(request.operation)
 
-            # Create successful result
+            if not mcp_tool:
+                # Handle operations not directly supported by MCP
+                return await self._handle_complex_operation(request, start_time)
+
+            # Prepare arguments for MCP tool
+            mcp_args = {"path": request.path}
+
+            if request.operation == FileOperation.WRITE and request.content is not None:
+                mcp_args["content"] = request.content
+            elif request.operation == FileOperation.MOVE and request.destination:
+                mcp_args["destination"] = request.destination
+            elif request.operation == FileOperation.DELETE and request.recursive:
+                mcp_args["recursive"] = request.recursive
+            elif (
+                request.operation == FileOperation.EDIT
+                and request.search_text
+                and request.replace_text is not None
+            ):
+                mcp_args["find"] = request.search_text
+                mcp_args["replace"] = request.replace_text
+
+            # Call MCP tool
+            result = await self._client.call_tool(mcp_tool, mcp_args)
+
+            # Create response
+            response = FileOperationResponse(
+                operation=request.operation,
+                success=True,
+                path=str(request.path),
+                result=result,
+                files_affected=1,
+                details=result,
+            )
+
             return ToolResult(
                 tool_name=self.name,
                 execution_id=response.request_id,
@@ -143,10 +192,10 @@ class FileOperationsTool(BaseModularTool[FileOperationRequest, FileOperationResp
             )
 
         except Exception as e:
-            logger.error(f"File operation failed: {e}")
+            logger.error(f"MCP file operation failed: {e}")
             return ToolResult(
                 tool_name=self.name,
-                execution_id="",
+                execution_id=str(uuid.uuid4()),
                 status=ToolStatus.FAILED,
                 error=str(e),
                 started_at=start_time,
@@ -154,472 +203,182 @@ class FileOperationsTool(BaseModularTool[FileOperationRequest, FileOperationResp
                 duration_seconds=(datetime.utcnow() - start_time).total_seconds(),
             )
 
-    async def _route_operation(self, request: FileOperationRequest) -> FileOperationResponse:
-        """Route to specific operation handler."""
-        handlers = {
-            FileOperation.READ: self._read_file,
-            FileOperation.WRITE: self._write_file,
-            FileOperation.APPEND: self._append_file,
-            FileOperation.DELETE: self._delete_file,
-            FileOperation.COPY: self._copy_file,
-            FileOperation.MOVE: self._move_file,
-            FileOperation.CREATE_DIR: self._create_directory,
-            FileOperation.LIST_DIR: self._list_directory,
-            FileOperation.SEARCH: self._search_files,
-            FileOperation.FIND: self._find_files,
-            FileOperation.GET_INFO: self._get_file_info,
-            FileOperation.EDIT: self._edit_file,
-            FileOperation.BATCH: self._batch_operations,
-        }
+    async def _handle_complex_operation(
+        self, request: FileOperationRequest, start_time: datetime
+    ) -> ToolResult:
+        """Handle operations that require multiple MCP calls."""
+        try:
+            if request.operation == FileOperation.APPEND:
+                # Read existing content
+                try:
+                    read_result = await self._client.call_tool("read_file", {"path": request.path})
+                    existing_content = read_result.get("content", "")
+                except Exception:
+                    existing_content = ""
 
-        handler = handlers.get(request.operation)
-        if not handler:
-            raise ValueError(f"Unknown operation: {request.operation}")
+                # Write combined content
+                new_content = existing_content + (request.content or "")
+                await self._client.call_tool(
+                    "write_file", {"path": request.path, "content": new_content}
+                )
 
-        return await handler(request)
+                result = {"bytes_appended": len((request.content or "").encode("utf-8"))}
 
-    async def _read_file(self, request: FileOperationRequest) -> FileOperationResponse:
-        """Read file contents."""
-        path = Path(request.path)
+            elif request.operation == FileOperation.COPY:
+                # Read source
+                read_result = await self._client.call_tool("read_file", {"path": request.path})
+                content = read_result.get("content", "")
 
-        if not path.exists():
-            raise FileNotFoundError(f"File not found: {path}")
+                # Write to destination
+                await self._client.call_tool(
+                    "write_file", {"path": request.destination, "content": content}
+                )
 
-        if not path.is_file():
-            raise ValueError(f"Not a file: {path}")
+                result = {
+                    "source": request.path,
+                    "destination": request.destination,
+                    "bytes_copied": len(content.encode("utf-8")),
+                }
 
-        # Check file size
-        if path.stat().st_size > FilesConfig.MAX_FILE_SIZE:
-            raise ValueError(f"File too large: {path.stat().st_size} bytes")
+            elif request.operation == FileOperation.SEARCH:
+                # Get list of files
+                list_result = await self._client.call_tool("list_directory", {"path": request.path})
 
-        # Try to read with different encodings
-        content = None
-        encoding_used = None
+                results = []
+                files = list_result.get("entries", [])
 
-        for encoding in [request.encoding] + FilesConfig.FALLBACK_ENCODINGS:
-            try:
-                content = path.read_text(encoding=encoding)
-                encoding_used = encoding
-                break
-            except UnicodeDecodeError:
-                continue
+                # Search through files
+                for entry in files:
+                    if entry.get("type") == "file":
+                        file_path = entry.get("path")
+                        try:
+                            read_result = await self._client.call_tool(
+                                "read_file", {"path": file_path}
+                            )
+                            content = read_result.get("content", "")
 
-        if content is None:
-            # Read as binary if text decoding fails
-            content = str(path.read_bytes())
-            encoding_used = "binary"
+                            if (
+                                request.search_text
+                                and request.search_text.lower() in content.lower()
+                            ):
+                                # Count occurrences
+                                matches = content.lower().count(request.search_text.lower())
+                                results.append(
+                                    {
+                                        "file": file_path,
+                                        "matches": matches,
+                                    }
+                                )
+                        except Exception:
+                            logger.debug(f"Error reading {file_path} during search")
 
-        return FileOperationResponse(
-            operation=request.operation,
-            success=True,
-            path=str(path),
-            result={
-                "content": content,
-                "size_bytes": path.stat().st_size,
-                "line_count": content.count("\n") + 1 if content else 0,
-                "encoding": encoding_used,
-            },
-            files_affected=1,
-            details={"encoding": encoding_used, "size": path.stat().st_size},
-        )
+                result = {"results": results, "files_searched": len(files)}
 
-    async def _write_file(self, request: FileOperationRequest) -> FileOperationResponse:
-        """Write content to file."""
-        path = Path(request.path)
+            elif request.operation == FileOperation.FIND:
+                # Use list_directory and filter by pattern
+                import fnmatch
 
-        # Create parent directories if needed
-        if request.create_parents and not path.parent.exists():
-            path.parent.mkdir(parents=True, exist_ok=True)
+                list_result = await self._client.call_tool("list_directory", {"path": request.path})
 
-        # Write content
-        content = request.content or ""
-        path.write_text(content, encoding=request.encoding)
+                entries = list_result.get("entries", [])
+                results = []
 
-        return FileOperationResponse(
-            operation=request.operation,
-            success=True,
-            path=str(path),
-            result={"bytes_written": len(content.encode(request.encoding)), "path": str(path)},
-            files_affected=1,
-            details={"size": len(content)},
-        )
+                for entry in entries:
+                    name = entry.get("name", "")
+                    if request.pattern and fnmatch.fnmatch(name, request.pattern):
+                        results.append(entry.get("path"))
 
-    async def _append_file(self, request: FileOperationRequest) -> FileOperationResponse:
-        """Append content to file."""
-        path = Path(request.path)
+                result = {"results": results, "count": len(results)}
 
-        # Create file if it doesn't exist
-        if not path.exists():
-            return await self._write_file(request)
+            elif request.operation == FileOperation.BATCH:
+                # Execute batch operations
+                results = []
+                total_files = 0
 
-        # Append content
-        with open(path, "a", encoding=request.encoding) as f:
-            f.write(request.content or "")
+                for op_data in request.batch_operations or []:
+                    try:
+                        op_request = FileOperationRequest(**op_data)  # ty: ignore[missing-argument]
+                        op_result = await self.execute(**op_data)
 
-        return FileOperationResponse(
-            operation=request.operation,
-            success=True,
-            path=str(path),
-            files_affected=1,
-            details={"appended_size": len(request.content or "")},
-        )
-
-    async def _delete_file(self, request: FileOperationRequest) -> FileOperationResponse:
-        """Delete file or directory."""
-        path = Path(request.path)
-
-        if not path.exists():
-            raise FileNotFoundError(f"Path not found: {path}")
-
-        files_deleted = 0
-
-        if path.is_file():
-            path.unlink()
-            files_deleted = 1
-        elif path.is_dir():
-            if request.recursive:
-                # Count files before deletion
-                files_deleted = sum(1 for _ in path.rglob("*") if _.is_file())
-                shutil.rmtree(path)
-            else:
-                path.rmdir()  # Only works on empty directories
-                files_deleted = 0
-
-        return FileOperationResponse(
-            operation=request.operation, success=True, path=str(path), files_affected=files_deleted
-        )
-
-    async def _copy_file(self, request: FileOperationRequest) -> FileOperationResponse:
-        """Copy file or directory."""
-        src = Path(request.path)
-        dst = Path(request.destination)
-
-        if not src.exists():
-            raise FileNotFoundError(f"Source not found: {src}")
-
-        files_copied = 0
-
-        if src.is_file():
-            # Create parent directories if needed
-            if request.create_parents and not dst.parent.exists():
-                dst.parent.mkdir(parents=True, exist_ok=True)
-
-            shutil.copy2(src, dst)
-            files_copied = 1
-        elif src.is_dir():
-            if request.recursive:
-                shutil.copytree(src, dst)
-                files_copied = sum(1 for _ in dst.rglob("*") if _.is_file())
-            else:
-                raise ValueError("Use recursive=True to copy directories")
-
-        return FileOperationResponse(
-            operation=request.operation,
-            success=True,
-            path=str(src),
-            result=str(dst),
-            files_affected=files_copied,
-        )
-
-    async def _move_file(self, request: FileOperationRequest) -> FileOperationResponse:
-        """Move file or directory."""
-        src = Path(request.path)
-        dst = Path(request.destination)
-
-        if not src.exists():
-            raise FileNotFoundError(f"Source not found: {src}")
-
-        # Create parent directories if needed
-        if request.create_parents and not dst.parent.exists():
-            dst.parent.mkdir(parents=True, exist_ok=True)
-
-        files_moved = 1
-        if src.is_dir():
-            files_moved = sum(1 for _ in src.rglob("*") if _.is_file())
-
-        shutil.move(str(src), str(dst))
-
-        return FileOperationResponse(
-            operation=request.operation,
-            success=True,
-            path=str(src),
-            result=str(dst),
-            files_affected=files_moved,
-        )
-
-    async def _create_directory(self, request: FileOperationRequest) -> FileOperationResponse:
-        """Create directory."""
-        path = Path(request.path)
-
-        path.mkdir(parents=request.create_parents, exist_ok=True)
-
-        return FileOperationResponse(
-            operation=request.operation, success=True, path=str(path), files_affected=0
-        )
-
-    async def _list_directory(self, request: FileOperationRequest) -> FileOperationResponse:
-        """List directory contents."""
-        path = Path(request.path)
-
-        if not path.exists():
-            raise FileNotFoundError(f"Directory not found: {path}")
-
-        if not path.is_dir():
-            raise ValueError(f"Not a directory: {path}")
-
-        entries = []
-
-        if request.recursive:
-            for item in path.rglob("*"):
-                if not FilesConfig.should_ignore(str(item)):
-                    entries.append(
-                        {
-                            "path": str(item),
-                            "name": item.name,
-                            "is_file": item.is_file(),
-                            "is_dir": item.is_dir(),
-                            "size": item.stat().st_size if item.is_file() else 0,
+                        result_entry = {
+                            "operation": op_request.operation.value,
+                            "path": op_request.path,
+                            "success": op_result.status == ToolStatus.COMPLETED,
                         }
-                    )
-        else:
-            for item in path.iterdir():
-                if not FilesConfig.should_ignore(str(item)):
-                    entries.append(
-                        {
-                            "path": str(item),
-                            "name": item.name,
-                            "is_file": item.is_file(),
-                            "is_dir": item.is_dir(),
-                            "size": item.stat().st_size if item.is_file() else 0,
-                        }
-                    )
 
-        return FileOperationResponse(
-            operation=request.operation,
-            success=True,
-            path=str(path),
-            result=entries,
-            files_affected=len(entries),
-        )
+                        # Add error message if operation failed
+                        if op_result.status == ToolStatus.FAILED and op_result.error:
+                            result_entry["error"] = op_result.error
 
-    async def _search_files(self, request: FileOperationRequest) -> FileOperationResponse:
-        """Search for text in files."""
-        path = Path(request.path)
-        results = []
+                        results.append(result_entry)
 
-        if not request.search_text:
-            raise ValueError("search_text required for search operation")
+                        if op_result.status == ToolStatus.COMPLETED:
+                            total_files += 1
 
-        pattern = re.compile(request.search_text, re.IGNORECASE)
-
-        # Determine files to search
-        if path.is_file():
-            files_to_search = [path]
-        elif path.is_dir() and request.recursive:
-            files_to_search = [
-                f for f in path.rglob("*") if f.is_file() and FilesConfig.is_text_file(str(f))
-            ]
-        elif path.is_dir():
-            files_to_search = [
-                f for f in path.iterdir() if f.is_file() and FilesConfig.is_text_file(str(f))
-            ]
-        else:
-            files_to_search = []
-
-        # Search files
-        for file_path in files_to_search[: FilesConfig.MAX_SEARCH_RESULTS]:
-            try:
-                content = file_path.read_text(encoding=request.encoding)
-                matches = list(pattern.finditer(content))
-
-                if matches:
-                    lines_with_matches = []
-                    for match in matches:
-                        line_num = content[: match.start()].count("\n") + 1
-                        lines_with_matches.append(
+                    except Exception as e:
+                        results.append(
                             {
-                                "line": line_num,
-                                "text": match.group(),
-                                "start": match.start(),
-                                "end": match.end(),
+                                "operation": op_data.get("operation"),
+                                "path": op_data.get("path"),
+                                "success": False,
+                                "error": str(e),
                             }
                         )
 
-                    results.append(
-                        {
-                            "file": str(file_path),
-                            "matches": len(matches),
-                            "lines": lines_with_matches[:10],  # Limit matches per file
-                        }
-                    )
-            except Exception as e:
-                logger.debug(f"Error searching {file_path}: {e}")
+                result = {"results": results, "total_operations": len(results)}
 
-        return FileOperationResponse(
-            operation=request.operation,
-            success=True,
-            path=str(path),
-            result=results,
-            files_affected=len(results),
-        )
+            else:
+                raise ValueError(f"Unsupported operation: {request.operation}")
 
-    async def _find_files(self, request: FileOperationRequest) -> FileOperationResponse:
-        """Find files by pattern."""
-        path = Path(request.path)
+            # Create response
+            response = FileOperationResponse(
+                operation=request.operation,
+                success=True,
+                path=str(request.path),
+                result=result,
+                files_affected=result.get("files_affected", 1),
+            )
 
-        if not request.pattern:
-            raise ValueError("pattern required for find operation")
+            return ToolResult(
+                tool_name=self.name,
+                execution_id=response.request_id,
+                status=ToolStatus.COMPLETED,
+                result=response.result,
+                started_at=start_time,
+                completed_at=datetime.utcnow(),
+                duration_seconds=(datetime.utcnow() - start_time).total_seconds(),
+                metadata={
+                    "operation": request.operation.value,
+                    "path": request.path,
+                    "files_affected": response.files_affected,
+                    "success": response.success,
+                },
+            )
 
-        if not path.exists():
-            raise FileNotFoundError(f"Path not found: {path}")
+        except Exception as e:
+            logger.error(f"Complex operation failed: {e}")
+            return ToolResult(
+                tool_name=self.name,
+                execution_id=str(uuid.uuid4()),
+                status=ToolStatus.FAILED,
+                error=str(e),
+                started_at=start_time,
+                completed_at=datetime.utcnow(),
+                duration_seconds=(datetime.utcnow() - start_time).total_seconds(),
+            )
 
-        results = []
+    async def cleanup(self):
+        """Cleanup MCP client connection."""
+        if self._client and self._initialized:
+            await self._client.disconnect()
+            self._initialized = False
 
-        if request.recursive and path.is_dir():
-            for item in path.rglob(request.pattern):
-                if not FilesConfig.should_ignore(str(item)):
-                    results.append(str(item))
-        elif path.is_dir():
-            for item in path.glob(request.pattern):
-                if not FilesConfig.should_ignore(str(item)):
-                    results.append(str(item))
-
-        return FileOperationResponse(
-            operation=request.operation,
-            success=True,
-            path=str(path),
-            result=results[: FilesConfig.MAX_SEARCH_RESULTS],
-            files_affected=len(results),
-        )
-
-    async def _get_file_info(self, request: FileOperationRequest) -> FileOperationResponse:
-        """Get detailed file information."""
-        path = Path(request.path)
-
-        if not path.exists():
-            raise FileNotFoundError(f"Path not found: {path}")
-
-        stat = path.stat()
-
-        info = FileInfo(
-            path=str(path),
-            name=path.name,
-            size=stat.st_size,
-            is_file=path.is_file(),
-            is_dir=path.is_dir(),
-            created=datetime.fromtimestamp(stat.st_ctime),
-            modified=datetime.fromtimestamp(stat.st_mtime),
-            permissions=oct(stat.st_mode)[-3:],
-        )
-
-        # Add mime type for files
-        if path.is_file():
-            if FilesConfig.is_text_file(str(path)):
-                info.mime_type = "text/plain"
-            elif FilesConfig.is_binary_file(str(path)):
-                info.mime_type = "application/octet-stream"
-
-        return FileOperationResponse(
-            operation=request.operation,
-            success=True,
-            path=str(path),
-            result=info.dict(),
-            files_affected=1,
-        )
-
-    async def _edit_file(self, request: FileOperationRequest) -> FileOperationResponse:
-        """Edit file with search and replace."""
-        if not request.search_text:
-            raise ValueError("search_text required for edit operation")
-
-        if request.replace_text is None:
-            request.replace_text = ""
-
-        # Read file
-        read_response = await self._read_file(request)
-        content = read_response.result["content"]
-
-        # Perform replacement
-        new_content = content.replace(request.search_text, request.replace_text)
-        replacements = content.count(request.search_text)
-
-        # Write back if changes were made
-        if replacements > 0:
-            request.content = new_content
-            await self._write_file(request)
-
-        return FileOperationResponse(
-            operation=request.operation,
-            success=True,
-            path=request.path,
-            result={"replacements": replacements},
-            files_affected=1 if replacements > 0 else 0,
-        )
-
-    async def _batch_operations(self, request: FileOperationRequest) -> FileOperationResponse:
-        """Execute multiple operations in batch."""
-        if not request.batch_operations:
-            raise ValueError("batch_operations required for batch operation")
-
-        if len(request.batch_operations) > FilesConfig.MAX_BATCH_SIZE:
-            raise ValueError(f"Batch size exceeds limit of {FilesConfig.MAX_BATCH_SIZE}")
-
-        results = []
-        total_files_affected = 0
-
-        for op_data in request.batch_operations:
-            try:
-                # Ensure operation is provided for batch item
-                if "operation" not in op_data:
-                    results.append(
-                        {
-                            "operation": "unknown",
-                            "success": False,
-                            "error": "Missing operation in batch item",
-                        }
-                    )
-                    continue
-
-                # Create request for individual operation
-                op_request = FileOperationRequest(**op_data)  # ty: ignore[missing-argument]
-                response = await self._route_operation(op_request)
-
-                results.append(
-                    {
-                        "operation": op_request.operation.value,
-                        "path": op_request.path,
-                        "success": response.success,
-                        "files_affected": response.files_affected,
-                    }
-                )
-
-                total_files_affected += response.files_affected
-
-            except Exception as e:
-                results.append(
-                    {
-                        "operation": op_data.get("operation"),
-                        "path": op_data.get("path"),
-                        "success": False,
-                        "error": str(e),
-                    }
-                )
-
-        return FileOperationResponse(
-            operation=request.operation,
-            success=all(r["success"] for r in results),
-            path="batch",
-            result=results,
-            files_affected=total_files_affected,
-        )
-
-    def _create_pydantic_tools(self) -> dict[str, Callable]:
+    def _create_pydantic_tools(self) -> dict[str, Any]:
         """Create PydanticAI-compatible tool functions."""
 
         async def read_file(path: str, encoding: str = "utf-8") -> dict[str, Any]:
             """Read file contents."""
             result = await self.execute(operation="read", path=path, encoding=encoding)
-            # Result is already a dict with content and metadata
             return result.result
 
         async def write_file(path: str, content: str, encoding: str = "utf-8") -> dict[str, Any]:
@@ -641,24 +400,19 @@ class FileOperationsTool(BaseModularTool[FileOperationRequest, FileOperationResp
             result = await self.execute(
                 operation="search", path=path, search_text=search_text, recursive=recursive
             )
-            return result.result
+            return result.result.get("results", [])
 
         async def find_files(path: str, pattern: str, recursive: bool = True) -> list[str]:
             """Find files by pattern."""
             result = await self.execute(
                 operation="find", path=path, pattern=pattern, recursive=recursive
             )
-            return result.result
+            return result.result.get("results", [])
 
         async def create_dir(path: str) -> dict[str, Any]:
             """Create a directory."""
             result = await self.execute(operation="create_dir", path=path)
             return {"created": result.status == ToolStatus.COMPLETED, "path": path}
-
-        async def list_files(path: str, recursive: bool = False) -> dict[str, Any]:
-            """List files in directory (alias for list_directory)."""
-            result = await self.execute(operation="list_dir", path=path, recursive=recursive)
-            return {"files": result.result}
 
         return {
             "read_file": read_file,
@@ -667,7 +421,6 @@ class FileOperationsTool(BaseModularTool[FileOperationRequest, FileOperationResp
             "search_files": search_files,
             "find_files": find_files,
             "create_dir": create_dir,
-            "list_files": list_files,
         }
 
     def _create_mcp_server(self):

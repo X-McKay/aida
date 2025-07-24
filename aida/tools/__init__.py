@@ -19,10 +19,7 @@ from aida.tools.llm_response import LLMResponseTool
 from aida.tools.system import SystemTool
 from aida.tools.thinking import ThinkingTool
 
-# Non-refactored tools commented out to meet deadline
-# from aida.tools.maintenance import MaintenanceTool
-# from aida.tools.project import ProjectTool
-# from aida.tools.architecture import ArchitectureTool
+# Legacy tools removed - see docs/tools/README.md for current hybrid tools
 
 __all__ = [
     "Tool",

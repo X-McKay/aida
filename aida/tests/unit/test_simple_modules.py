@@ -26,8 +26,10 @@ def test_core_init():
     """Test core package imports."""
     from aida import core
 
-    assert hasattr(core, "Agent")
-    assert hasattr(core, "BaseAgent")
+    assert hasattr(core, "A2AProtocol")
+    assert hasattr(core, "MCPProtocol")
+    assert hasattr(core, "Event")
+    assert hasattr(core, "EventBus")
 
 
 # Test llm init

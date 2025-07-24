@@ -1,4 +1,4 @@
-"""File operations tool for comprehensive file and directory management."""
+"""File operations tool using official MCP filesystem server."""
 
 from .config import FilesConfig
 from .files import FileOperationsTool

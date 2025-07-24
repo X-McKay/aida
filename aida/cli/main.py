@@ -26,6 +26,7 @@ from aida.cli.commands.llm import llm_app
 from aida.cli.commands.system import system_app
 from aida.cli.commands.test import test_app
 from aida.cli.commands.tools import tools_app
+from aida.cli.commands.tui import tui_app
 from aida.cli.ui import setup_console
 
 # Create main Typer application
@@ -44,6 +45,7 @@ app.add_typer(system_app, name="system", help="System administration")
 app.add_typer(chat_app, name="chat", help="Chat with AIDA")
 app.add_typer(tools_app, name="tools", help="Tool management and execution")
 app.add_typer(test_app, name="test", help="Integration testing for refactored components")
+app.add_typer(tui_app, name="tui", help="Text User Interface")
 
 # Setup console
 console = setup_console()

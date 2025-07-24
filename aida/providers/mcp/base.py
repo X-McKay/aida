@@ -90,6 +90,12 @@ class MCPProvider(ABC):
         """Call a tool via MCP."""
         response = await self.send_message("tools/call", {"name": name, "arguments": arguments})
 
+        if response.error:
+            raise Exception(f"MCP tool call failed: {response.error}")
+
+        # Debug logging
+        logger.debug(f"MCP call_tool response for '{name}': {response.result}")
+
         return response.result or {}
 
     async def list_resources(self) -> list[dict[str, Any]]:
