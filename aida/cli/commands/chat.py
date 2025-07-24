@@ -14,7 +14,6 @@ from rich.table import Table
 import typer
 
 from aida.cli.ui.console import get_console
-from aida.core.agent import Agent, AgentCapability, AgentConfig
 from aida.tools.base import get_tool_registry, initialize_default_tools
 
 chat_app = typer.Typer(name="chat")
@@ -45,7 +44,6 @@ class ChatSession:
         - Session tracking with unique ID based on timestamp
         - Multiline input support for complex queries
         """
-        self.agent: Agent | None = None
         # LLM will be accessed through orchestrator
         self.tool_registry = get_tool_registry()
         self.conversation_history: list[dict[str, Any]] = []
@@ -126,29 +124,7 @@ class ChatSession:
         except Exception as e:
             console.print(f"[warning]⚠️  Tool initialization warning: {e}[/warning]")
 
-        # Create enhanced agent
-        config = AgentConfig(
-            name="aida_chat_agent",
-            description="Enhanced chat agent with streaming and context management",
-            capabilities=[
-                AgentCapability(
-                    name="chat_conversation",
-                    description="Natural conversation with context awareness",
-                ),
-                AgentCapability(
-                    name="tool_orchestration",
-                    description="Intelligent tool selection and execution",
-                ),
-                AgentCapability(
-                    name="llm_reasoning", description="Advanced reasoning with streaming responses"
-                ),
-            ],
-        )
-
-        self.agent = Agent(config)
-        await self.agent.start()
-
-        console.print("[dim]✅ Chat agent ready[/dim]\n")
+        console.print("[dim]✅ Chat ready[/dim]\n")
 
     async def _handle_user_input(self):
         """Handle enhanced user input with multiline support."""
@@ -610,11 +586,8 @@ class ChatSession:
         duration = datetime.utcnow() - self.session_started
         table.add_row("Session", "Active", f"ID: {self.session_id}, Duration: {duration}")
 
-        # Agent status
-        if self.agent:
-            table.add_row(
-                "Agent", "Running" if self.agent._started else "Stopped", f"Name: {self.agent.name}"
-            )
+        # Orchestrator status
+        table.add_row("Orchestrator", "Ready", "Using new CoordinatorAgent")
 
         # Tools
         tools_count = len(await self.tool_registry.list_tools())
@@ -767,9 +740,6 @@ class ChatSession:
 
     async def _cleanup(self):
         """Cleanup session resources."""
-        if self.agent:
-            await self.agent.stop()
-
         # Auto-save session
         await self._save_session()
 

@@ -20,6 +20,9 @@ def check_imports():
         "from aida.llm import get_llm, chat",
         "from aida.tools.base import get_tool_registry",
         "from aida.config.llm_profiles import Purpose",
+        "from aida.agents.coordination.coordinator_agent import CoordinatorAgent",
+        "from aida.agents.worker.coding_worker import CodingWorker",
+        "from aida.core.protocols.a2a import A2AProtocol",
     ]
 
     for imp in critical_imports:
@@ -52,26 +55,27 @@ async def check_llm_system():
         return False
 
 
-async def check_orchestrator():
-    """Verify orchestrator works."""
-    print("3. Checking orchestrator...", end=" ")
+async def check_coordinator():
+    """Verify coordinator works."""
+    print("3. Checking coordinator...", end=" ")
     try:
-        from aida.core.orchestrator import get_orchestrator
+        from aida.agents.coordination.coordinator_agent import CoordinatorAgent
 
-        orch = get_orchestrator()
+        # Create a test coordinator (it has default config)
+        coordinator = CoordinatorAgent()
 
         # Check critical methods exist
-        if not hasattr(orch, "execute_request"):
-            print("\n   ❌ Missing execute_request method")
+        if not hasattr(coordinator, "execute_plan"):
+            print("\n   ❌ Missing execute_plan method")
             return False
-        if not hasattr(orch, "create_plan"):
-            print("\n   ❌ Missing create_plan method")
+        if not hasattr(coordinator, "handle_message"):
+            print("\n   ❌ Missing handle_message method")
             return False
 
         print("✅")
         return True
     except Exception as e:
-        print(f"\n   ❌ Orchestrator failed: {e}")
+        print(f"\n   ❌ Coordinator failed: {e}")
         return False
 
 
@@ -129,7 +133,7 @@ async def run_smoke_tests():
 
     # Async checks
     all_passed &= await check_llm_system()
-    all_passed &= await check_orchestrator()
+    all_passed &= await check_coordinator()
     all_passed &= await check_chat_session()
 
     print("=" * 50)

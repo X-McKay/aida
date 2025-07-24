@@ -69,6 +69,7 @@ class A2AProtocol(Protocol):
         self.host = host
         self.port = port
         self.discovery_enabled = discovery_enabled
+        self._instance_id = id(self)  # Unique identifier for debugging
 
         # Connection management
         self._server = None
@@ -121,10 +122,10 @@ class A2AProtocol(Protocol):
             task.cancel()
 
         # Close all connections
-        for conn in self._connections.values():
+        for conn in list(self._connections.values()):
             await conn.close()
 
-        for conn in self._client_connections.values():
+        for conn in list(self._client_connections.values()):
             await conn.close()
 
         # Stop server
@@ -170,7 +171,22 @@ class A2AProtocol(Protocol):
     async def receive(self) -> A2AMessage | None:
         """Receive a message from another agent."""
         try:
+            # Log queue size periodically
+            if (
+                hasattr(self, "_last_queue_log")
+                and asyncio.get_event_loop().time() - self._last_queue_log > 5
+            ):
+                logger.debug(
+                    f"Agent {self.agent_id} incoming queue size: {self._incoming_queue.qsize()} (instance {self._instance_id})"
+                )
+                self._last_queue_log = asyncio.get_event_loop().time()
+            elif not hasattr(self, "_last_queue_log"):
+                self._last_queue_log = asyncio.get_event_loop().time()
+
             message = await asyncio.wait_for(self._incoming_queue.get(), timeout=1.0)
+            logger.debug(
+                f"Agent {self.agent_id} received message from queue: {message.message_type} (instance {self._instance_id})"
+            )
             return message
         except TimeoutError:
             return None
@@ -232,7 +248,7 @@ class A2AProtocol(Protocol):
         self._stats["connections_active"] = len(self._connections) + len(self._client_connections)
         return self._stats.copy()
 
-    async def _handle_connection(self, websocket: WebSocketServerProtocol, path: str):
+    async def _handle_connection(self, websocket: WebSocketServerProtocol):
         """Handle incoming WebSocket connections."""
         agent_id = None
         try:
@@ -287,11 +303,18 @@ class A2AProtocol(Protocol):
 
     async def _handle_client_connection(self, agent_id: str, websocket: WebSocketClientProtocol):
         """Handle outgoing client connections."""
+        logger.debug(f"Starting client connection handler for {agent_id}")
         try:
             async for message_data in websocket:
                 try:
                     message = A2AMessage.parse_raw(message_data)
+                    logger.debug(
+                        f"Client received message type {message.message_type} from {message.sender_id} (instance {self._instance_id})"
+                    )
                     await self._incoming_queue.put(message)
+                    logger.debug(
+                        f"Queued message to incoming queue, new size: {self._incoming_queue.qsize()} (instance {self._instance_id})"
+                    )
                     self._stats["messages_received"] += 1
 
                 except Exception as e:
@@ -325,10 +348,15 @@ class A2AProtocol(Protocol):
 
     async def _send_to_agent(self, agent_id: str, message: A2AMessage):
         """Send message to a specific agent."""
+        logger.debug(f"Attempting to send message type {message.message_type} to agent {agent_id}")
+        logger.debug(f"Server connections: {list(self._connections.keys())}")
+        logger.debug(f"Client connections: {list(self._client_connections.keys())}")
+
         # Try server connection first
         if agent_id in self._connections:
             try:
                 await self._connections[agent_id].send(message.json())
+                logger.debug(f"Successfully sent message to {agent_id} via server connection")
                 return
             except Exception as e:
                 logger.error(f"Failed to send via server connection: {e}")
@@ -338,6 +366,7 @@ class A2AProtocol(Protocol):
         if agent_id in self._client_connections:
             try:
                 await self._client_connections[agent_id].send(message.json())
+                logger.debug(f"Successfully sent message to {agent_id} via client connection")
                 return
             except Exception as e:
                 logger.error(f"Failed to send via client connection: {e}")
@@ -346,8 +375,11 @@ class A2AProtocol(Protocol):
         # If no direct connection, try to establish one
         if agent_id in self._known_agents:
             agent_info = self._known_agents[agent_id]
+            logger.debug(f"Attempting to connect to {agent_id} at {agent_info.endpoint}")
             if await self.connect_to_agent(agent_info.endpoint):
                 await self._send_to_agent(agent_id, message)
+        else:
+            logger.warning(f"No connection or agent info for {agent_id}")
 
     async def _broadcast_message(self, message: A2AMessage):
         """Broadcast message to all connected agents."""

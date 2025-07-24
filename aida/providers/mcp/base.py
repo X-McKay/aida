@@ -93,6 +93,9 @@ class MCPProvider(ABC):
         if response.error:
             raise Exception(f"MCP tool call failed: {response.error}")
 
+        # Debug logging
+        logger.debug(f"MCP call_tool response for '{name}': {response.result}")
+
         return response.result or {}
 
     async def list_resources(self) -> list[dict[str, Any]]:

@@ -20,9 +20,18 @@ class MCPFilesystemClient(MCPProvider):
 
         Args:
             allowed_directories: List of directories the server can access.
-                               If None, will use current working directory.
+                               If None, will use current working directory and .aida subdirectory.
         """
-        self.allowed_directories = allowed_directories or [os.getcwd()]
+        if allowed_directories is None:
+            # Default to current working directory and .aida subdirectory
+            cwd = os.getcwd()
+            aida_dir = os.path.join(cwd, ".aida")
+            # Create .aida directory if it doesn't exist
+            os.makedirs(aida_dir, exist_ok=True)
+            self.allowed_directories = [cwd, aida_dir]
+        else:
+            self.allowed_directories = allowed_directories
+
         super().__init__("filesystem", {"directories": self.allowed_directories})
 
         self._process = None
@@ -55,12 +64,17 @@ class MCPFilesystemClient(MCPProvider):
             # Start reading messages from server
             self._read_task = asyncio.create_task(self._read_messages())
 
-            # Initialize the session
-            await self.initialize_session()
-
+            # Mark as connected before initializing session
             self._connected = True
-            logger.info("Successfully connected to MCP filesystem server")
-            return True
+
+            # Initialize the session
+            try:
+                await self.initialize_session()
+                logger.info("Successfully connected to MCP filesystem server")
+                return True
+            except Exception:
+                self._connected = False
+                raise
 
         except Exception as e:
             logger.error(f"Failed to connect to MCP filesystem server: {e}")
