@@ -20,6 +20,12 @@ from aida.agents.base.messages import (
     WorkerMessageTypes,
     create_task_assignment_message,
 )
+from aida.agents.coordination.dispatcher import (
+    DispatchStrategy,
+    RetryStrategy,
+    TaskDispatcher,
+    TaskResult,
+)
 from aida.agents.coordination.plan_models import (
     ReplanReason,
     TodoPlan,
@@ -27,6 +33,7 @@ from aida.agents.coordination.plan_models import (
     TodoStep,
 )
 from aida.agents.coordination.storage import CoordinatorPlanStorage
+from aida.agents.coordination.task_reviser import ReflectionAnalyzer, TaskReviser
 from aida.core.protocols.a2a import A2AMessage, AgentInfo
 from aida.llm import get_llm
 
@@ -90,7 +97,10 @@ class CoordinatorAgent(BaseAgent):
         super().__init__(config or default_config)
 
         # Worker discovery and tracking
-        self._known_workers: dict[str, AgentInfo] = {}
+        # Maps worker_id to either WorkerProxy (for task execution) or AgentInfo (for discovery)
+        from aida.agents.coordination.worker_proxy import WorkerProxy
+
+        self._known_workers: dict[str, WorkerProxy | AgentInfo] = {}
         self._worker_capabilities: dict[str, list[WorkerCapability]] = {}
         self._capability_index: dict[str, list[WorkerCapability]] = {}
 
@@ -98,6 +108,17 @@ class CoordinatorAgent(BaseAgent):
         self._active_plans: dict[str, TodoPlan] = {}
         self._plan_workers: dict[str, dict[str, str]] = {}  # plan_id -> {step_id: worker_id}
         self._step_tasks: dict[str, asyncio.Task] = {}  # step_id -> monitoring task
+
+        # Initialize dispatcher and revision components
+        self._dispatcher: TaskDispatcher | None = None
+        self._task_reviser = TaskReviser()
+        self._reflection_analyzer = ReflectionAnalyzer()
+
+        # Dispatcher configuration
+        self._dispatch_strategy = DispatchStrategy.CAPABILITY_BASED
+        self._retry_strategy = RetryStrategy.EXPONENTIAL_BACKOFF
+        self._max_retries = 3
+        self._task_timeout = 300.0
 
         # Storage manager
         storage_dir = getattr(config, "storage_dir", ".aida/coordinator/plans")
@@ -124,6 +145,9 @@ class CoordinatorAgent(BaseAgent):
         # Start plan monitoring
         self._tasks.add(asyncio.create_task(self._monitor_active_plans()))
 
+        # Initialize dispatcher with discovered workers
+        await self._update_dispatcher()
+
     async def handle_message(self, message: A2AMessage) -> A2AMessage | None:
         """Handle incoming A2A messages.
 
@@ -143,6 +167,8 @@ class CoordinatorAgent(BaseAgent):
             WorkerMessageTypes.TASK_PROGRESS: self._handle_task_progress,
             WorkerMessageTypes.TASK_COMPLETION: self._handle_task_completion,
             WorkerMessageTypes.WORKER_STATUS: self._handle_worker_status,
+            # Handle task responses from workers
+            "task_response": self._handle_task_response,
             # Handle handshake for A2A protocol
             "handshake": self._handle_handshake,
         }
@@ -229,7 +255,7 @@ class CoordinatorAgent(BaseAgent):
             raise RuntimeError(f"Plan creation failed: {e}") from e
 
     async def execute_plan(self, plan: TodoPlan) -> dict[str, Any]:
-        """Execute a TodoPlan by delegating to workers.
+        """Execute a TodoPlan by delegating to workers using TaskDispatcher.
 
         Args:
             plan: The plan to execute
@@ -239,10 +265,21 @@ class CoordinatorAgent(BaseAgent):
         """
         logger.info(f"Starting execution of plan {plan.id}")
 
-        # Ensure we have current worker information
+        # Ensure we have current worker information and dispatcher
         await self._discover_workers()
+        await self._update_dispatcher()
+
+        if not self._dispatcher:
+            logger.error("No dispatcher available - no workers found")
+            return {
+                "plan_id": plan.id,
+                "status": "failed",
+                "error": "No workers available",
+                "results": [],
+            }
 
         results = []
+        step_results = {}  # Track results for each step
 
         while True:
             # Check if we should replan
@@ -261,6 +298,8 @@ class CoordinatorAgent(BaseAgent):
                 progress = plan.get_progress()
                 if plan.status == "completed":
                     logger.info(f"Plan {plan.id} completed successfully")
+                    # Run reflection analysis
+                    await self._run_reflection_analysis(plan, step_results)
                     # Save final state and archive
                     self._storage.save_plan(plan, "archived")
                     break
@@ -274,30 +313,66 @@ class CoordinatorAgent(BaseAgent):
                     await asyncio.sleep(1)
                     continue
 
-            # Delegate step to worker
+            # Execute step using dispatcher
             try:
-                worker_id = await self._select_worker_for_step(next_step)
-                if not worker_id:
-                    next_step.status = TodoStatus.FAILED
-                    next_step.error = "No suitable worker found"
-                    logger.error(f"No worker found for step {next_step.id}")
-                    continue
+                # Mark as in progress
+                next_step.status = TodoStatus.IN_PROGRESS
+                next_step.started_at = datetime.utcnow()
 
-                # Send task to worker
-                task_sent = await self._delegate_step_to_worker(plan.id, next_step, worker_id)
+                # Dispatch with retry logic
+                result = await self._dispatcher.dispatch(
+                    step=next_step,
+                    context={"plan_id": plan.id, "plan_context": plan.context},
+                    task_id=f"{plan.id}_{next_step.id}",
+                    enable_revision=True,
+                )
 
-                if task_sent:
-                    next_step.status = TodoStatus.IN_PROGRESS
-                    next_step.started_at = datetime.utcnow()
-                    self._plan_workers[plan.id][next_step.id] = worker_id
+                # Store result
+                step_results[next_step.id] = result
+
+                if result.success:
+                    next_step.status = TodoStatus.COMPLETED
+                    next_step.result = result.result
+                    next_step.completed_at = datetime.utcnow()
+                    logger.info(f"Step {next_step.id} completed successfully")
                 else:
+                    # Check if we should revise and retry
+                    # The dispatcher has exhausted its retries, but we can still try revision
+                    if result.retriable and self._task_reviser:
+                        logger.info(f"Attempting to revise failed step {next_step.id}")
+                        # Try to revise the task
+                        revision = await self._task_reviser.revise_task(
+                            step=next_step,
+                            failure_result=result,
+                            context=plan.context,
+                        )
+
+                        if revision and revision.confidence > 0.6:
+                            # Apply revision and retry
+                            revised_step = self._task_reviser.apply_revision(next_step, revision)
+                            # Replace step in plan
+                            for i, step in enumerate(plan.steps):
+                                if step.id == next_step.id:
+                                    plan.steps[i] = revised_step
+                                    break
+                            logger.info(
+                                f"Applied revision to step {next_step.id}: {revision.approach_changes}"
+                            )
+                            # Reset status to retry
+                            revised_step.status = TodoStatus.PENDING
+                            continue
+
+                    # Mark as failed
                     next_step.status = TodoStatus.FAILED
-                    next_step.error = "Failed to send task to worker"
+                    next_step.error = result.error
+                    next_step.completed_at = datetime.utcnow()
+                    logger.error(f"Step {next_step.id} failed: {result.error}")
 
             except Exception as e:
-                logger.error(f"Error delegating step {next_step.id}: {e}")
+                logger.error(f"Error executing step {next_step.id}: {e}")
                 next_step.status = TodoStatus.FAILED
                 next_step.error = str(e)
+                next_step.completed_at = datetime.utcnow()
 
         # Collect final results
         for step in plan.steps:
@@ -311,12 +386,80 @@ class CoordinatorAgent(BaseAgent):
                     }
                 )
 
+        # Get dispatcher metrics
+        metrics = self._dispatcher.get_metrics() if self._dispatcher else {}
+
         return {
             "plan_id": plan.id,
-            "status": plan.get_progress()["status"],
+            "status": plan.status,
             "results": results,
-            "summary": plan.get_summary_stats(),
+            "summary": plan.get_progress(),
+            "step_results": {k: v.to_dict() for k, v in step_results.items()},
+            "metrics": metrics,
         }
+
+    async def _update_dispatcher(self) -> None:
+        """Update the task dispatcher with current workers."""
+        # Get all known workers
+        workers = list(self._known_workers.values())
+
+        if workers:
+            # Create new dispatcher with current workers
+            self._dispatcher = TaskDispatcher(
+                agents=workers,
+                dispatch_strategy=self._dispatch_strategy,
+                retry_strategy=self._retry_strategy,
+                max_retries=self._max_retries,
+                timeout=self._task_timeout,
+            )
+            logger.info(f"Updated dispatcher with {len(workers)} workers")
+        else:
+            logger.warning("No workers available for dispatcher")
+            self._dispatcher = None
+
+    async def _run_reflection_analysis(
+        self, plan: TodoPlan, step_results: dict[str, TaskResult]
+    ) -> None:
+        """Run reflection analysis on completed plan."""
+        try:
+            # Prepare plan summary
+            plan_summary = {
+                "plan_id": plan.id,
+                "user_request": plan.user_request,
+                "total_steps": len(plan.steps),
+                "completed_steps": sum(1 for s in plan.steps if s.status == TodoStatus.COMPLETED),
+                "failed_steps": sum(1 for s in plan.steps if s.status == TodoStatus.FAILED),
+                "execution_time": (
+                    (plan.last_updated - plan.created_at).total_seconds()
+                    if plan.last_updated
+                    else 0
+                ),
+            }
+
+            # Get dispatcher metrics
+            metrics = self._dispatcher.get_metrics() if self._dispatcher else {}
+
+            # Run analysis
+            analysis = await self._reflection_analyzer.analyze_execution(
+                plan_summary=plan_summary,
+                metrics=metrics,
+            )
+
+            # Store analysis results
+            if not hasattr(plan, "reflection_analysis"):
+                plan.reflection_analysis = []
+
+            plan.reflection_analysis.append(
+                {
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "analysis": analysis,
+                }
+            )
+
+            logger.info(f"Completed reflection analysis for plan {plan.id}")
+
+        except Exception as e:
+            logger.error(f"Failed to run reflection analysis: {e}")
 
     async def _handle_handshake(self, message: A2AMessage) -> A2AMessage:
         """Handle A2A protocol handshake."""
@@ -327,6 +470,20 @@ class CoordinatorAgent(BaseAgent):
             message_type="handshake",
             payload={"capabilities": self.capabilities, "agent_type": self.agent_type},
         )
+
+    async def _handle_task_response(self, message: A2AMessage) -> A2AMessage | None:
+        """Handle task response from worker and route to proxy."""
+        worker_id = message.sender_id
+
+        # Find the proxy for this worker
+        proxy = self._known_workers.get(worker_id)
+        if proxy and hasattr(proxy, "handle_worker_response"):
+            # Route the response to the proxy
+            proxy.handle_worker_response(message)
+        else:
+            logger.warning(f"Received task response from unknown worker: {worker_id}")
+
+        return None
 
     async def _handle_task_request(self, message: A2AMessage) -> A2AMessage:
         """Handle task request from user or another agent."""
@@ -360,13 +517,17 @@ class CoordinatorAgent(BaseAgent):
         worker_type = payload["worker_type"]
         capabilities = payload["capabilities"]
 
-        # Update known workers
-        self._known_workers[worker_id] = AgentInfo(
-            agent_id=worker_id,
+        # Create a proxy for the remote worker
+        from aida.agents.coordination.worker_proxy import WorkerProxy
+
+        proxy = WorkerProxy(
+            worker_id=worker_id,
             capabilities=capabilities,
-            endpoint=f"ws://{worker_id}",  # Would get from protocol
-            last_seen=asyncio.get_event_loop().time(),
+            coordinator_agent=self,
         )
+
+        # Store the proxy as the "worker" for the dispatcher
+        self._known_workers[worker_id] = proxy
 
         # Update capability tracking
         self._worker_capabilities[worker_id] = []
@@ -525,72 +686,6 @@ class CoordinatorAgent(BaseAgent):
         logger.debug(f"Worker {worker_id} status: {state}")
         return None
 
-    async def _handle_task_response(self, message: A2AMessage) -> A2AMessage | None:
-        """Handle task response from worker."""
-        correlation_id = message.correlation_id
-        if not correlation_id:
-            logger.warning("Received task response without correlation ID")
-            return None
-
-        # Find the step this response is for
-        step_id = None
-        plan_id = None
-        for pid, workers in self._plan_workers.items():
-            for sid, wid in workers.items():
-                if wid == message.sender_id:
-                    # Check if this might be our response
-                    # (In production, would use correlation ID mapping)
-                    step_id = sid
-                    plan_id = pid
-                    break
-
-        if not step_id or not plan_id:
-            logger.warning(f"Could not find step for response from {message.sender_id}")
-            return None
-
-        plan = self._active_plans.get(plan_id)
-        if not plan:
-            logger.warning(f"Plan {plan_id} not found")
-            return None
-
-        # Find step
-        step = next((s for s in plan.steps if s.id == step_id), None)
-        if not step:
-            logger.warning(f"Step {step_id} not found in plan {plan_id}")
-            return None
-
-        # Update step based on response
-        response_data = message.payload
-        if response_data.get("status") == "success":
-            step.status = TodoStatus.COMPLETED
-            step.result = response_data.get("result", {})
-            step.completed_at = datetime.utcnow()
-
-            # Save updated plan state
-            self._storage.save_plan(plan)
-
-            # Update worker stats
-            worker_id = message.sender_id
-            capability = step.tool_name
-            response_time = (step.completed_at - step.started_at).total_seconds()
-            self._update_worker_stats(worker_id, capability, True, response_time)
-
-            logger.info(f"Step {step_id} completed successfully by {worker_id}")
-        else:
-            step.status = TodoStatus.FAILED
-            step.error = response_data.get("error", "Unknown error")
-            step.completed_at = datetime.utcnow()
-
-            # Update worker stats
-            worker_id = message.sender_id
-            capability = step.tool_name
-            response_time = (step.completed_at - step.started_at).total_seconds()
-            self._update_worker_stats(worker_id, capability, False, response_time)
-
-            logger.error(f"Step {step_id} failed: {step.error}")
-
-        return None
-
     async def _handle_task_status(self, message: A2AMessage) -> A2AMessage | None:
         """Handle task status update from worker."""
         # Similar to task response but for progress updates
@@ -608,13 +703,27 @@ class CoordinatorAgent(BaseAgent):
         capabilities = message.payload.get("capabilities", [])
         agent_type = message.payload.get("agent_type", "unknown")
 
-        # Update known workers
-        self._known_workers[worker_id] = AgentInfo(
-            agent_id=worker_id,
-            capabilities=capabilities,
-            endpoint=f"ws://{message.sender_id}",  # Simplified - would get from protocol
-            last_seen=asyncio.get_event_loop().time(),
-        )
+        # Check if we already have a WorkerProxy for this worker
+        if worker_id in self._known_workers and hasattr(
+            self._known_workers[worker_id], "handle_message"
+        ):
+            # We already have a proxy, just update its capabilities if needed
+            logger.debug(f"Updating capabilities for existing worker proxy {worker_id}")
+            # Update the proxy's capabilities
+            if hasattr(self._known_workers[worker_id], "capabilities"):
+                self._known_workers[worker_id].capabilities = capabilities
+        else:
+            # No proxy exists, this might be from discovery before registration
+            # Store as AgentInfo temporarily until proper registration
+            logger.debug(
+                f"Storing AgentInfo for discovered worker {worker_id} (awaiting registration)"
+            )
+            self._known_workers[worker_id] = AgentInfo(
+                agent_id=worker_id,
+                capabilities=capabilities,
+                endpoint=f"ws://{message.sender_id}",  # Simplified - would get from protocol
+                last_seen=asyncio.get_event_loop().time(),
+            )
 
         # Update capability tracking
         self._worker_capabilities[worker_id] = []

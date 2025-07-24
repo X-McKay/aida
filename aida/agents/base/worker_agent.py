@@ -223,8 +223,10 @@ class WorkerAgent(BaseAgent):
 
         if response:
             logger.info("Successfully registered with coordinator")
-            # Coordinator ID would typically come from the response
-            self.coordinator_id = "coordinator_001"  # Hardcoded for now
+            # Store the coordinator ID from the response
+            self.coordinator_id = (
+                message.recipient_id
+            )  # Use the actual coordinator we're registering with
         else:
             logger.error("Failed to register with coordinator")
 
@@ -275,6 +277,8 @@ class WorkerAgent(BaseAgent):
             "priority": payload.get("priority", 5),
             "received_at": datetime.utcnow(),
             "coordinator_id": message.sender_id,
+            "original_message": message,  # Store the original message to respond to
+            "correlation_id": message.correlation_id,  # Store correlation ID if present
         }
 
         # Queue the task
@@ -475,6 +479,28 @@ class WorkerAgent(BaseAgent):
         execution_time: float = 0.0,
     ) -> None:
         """Send task completion to coordinator."""
+        # Check if we have the original message to respond to
+        task_data = self._active_tasks.get(task_id)
+        if task_data and "original_message" in task_data:
+            # Send response to the original sender (could be proxy)
+            original_msg = task_data["original_message"]
+            response = A2AMessage(
+                sender_id=self.agent_id,
+                recipient_id=original_msg.sender_id,
+                message_type="task_response",
+                correlation_id=task_data.get("correlation_id") or original_msg.correlation_id,
+                payload={
+                    "task_id": task_id,
+                    "success": success,
+                    "result": result,
+                    "error": error,
+                    "execution_time": execution_time,
+                    "worker_id": self.agent_id,
+                },
+            )
+            await self.send_message(response)
+
+        # Also send completion to coordinator for tracking
         completion_data = create_task_completion_message(
             worker_id=self.agent_id,
             coordinator_id=coordinator_id,
