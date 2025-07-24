@@ -53,7 +53,11 @@ class MCPSearXNGClient(MCPProvider):
 
             # Start the server process
             self._process = await asyncio.create_subprocess_exec(
-                *cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                cmd[0],
+                *cmd[1:],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
             )
 
             self._reader = self._process.stdout
@@ -76,7 +80,6 @@ class MCPSearXNGClient(MCPProvider):
 
     async def disconnect(self) -> None:
         """Disconnect from MCP server and cleanup process."""
-
         if self._read_task and not self._read_task.done():
             self._read_task.cancel()
 
@@ -268,8 +271,9 @@ class WebSearchTool(BaseModularTool[WebSearchRequest, WebSearchResponse, WebSear
                     metadata={"error_type": "validation_error"},
                 )
 
-            # Create request model
-            request = WebSearchRequest(**kwargs)
+            # Create request model - operation is guaranteed to exist at this point
+            operation = kwargs["operation"]  # Use indexing since we know it exists
+            request = WebSearchRequest(operation=operation, **kwargs)
 
             # Map operations to MCP tool names
             operation_map = {

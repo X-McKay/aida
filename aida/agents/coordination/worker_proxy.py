@@ -123,7 +123,7 @@ class WorkerProxy(BaseAgent):
             task_id = payload.get("task_id")
 
             # Look for a matching future
-            for cid, future in self._pending_responses.items():
+            for cid, _future in self._pending_responses.items():
                 if task_id and task_id in cid:
                     correlation_id = cid
                     break

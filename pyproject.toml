@@ -188,7 +188,10 @@ known-first-party = ["aida"]
 force-sort-within-sections = true
 
 [tool.ty.src]
-exclude = ["aida/tests"]
+exclude = [
+    "aida/tests",
+    "aida/agents/base/sandbox.py",  # Dagger type issues
+]
 
 [tool.pytest.ini_options]
 minversion = "7.0"

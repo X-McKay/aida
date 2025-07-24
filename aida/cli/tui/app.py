@@ -6,7 +6,7 @@ import sys
 
 from textual.app import App, ComposeResult
 from textual.containers import Container, Horizontal, Vertical
-from textual.widgets import Footer, Header, Static
+from textual.widgets import Footer, Header
 
 from .widgets.agents import AgentsWidget
 from .widgets.chat import ChatWidget
@@ -44,35 +44,55 @@ class AIDATui(App):
     #left-panel {
         width: 66%;
         height: 100%;
-        border-right: solid $primary;
+        padding: 0 1 1 1;
     }
 
     #right-panel {
         width: 34%;
         height: 100%;
+        padding: 0 1 1 1;
+    }
+
+    #chat-container {
+        height: 100%;
+        border: solid $primary;
+        border-title-color: $primary;
+        border-title-background: $surface;
+        border-title-align: center;
+        padding: 1;
+        background: $panel;
     }
 
     #resource-monitor {
         height: 33%;
-        border-bottom: solid $primary;
+        border: solid $primary;
+        border-title-color: $primary;
+        border-title-background: $surface;
+        border-title-align: center;
         padding: 1;
+        margin-bottom: 1;
+        background: $panel;
     }
 
     #tasks-widget {
         height: 33%;
-        border-bottom: solid $primary;
+        border: solid $primary;
+        border-title-color: $primary;
+        border-title-background: $surface;
+        border-title-align: center;
         padding: 1;
+        margin-bottom: 1;
+        background: $panel;
     }
 
     #agents-widget {
-        height: 34%;
+        height: 33%;
+        border: solid $primary;
+        border-title-color: $primary;
+        border-title-background: $surface;
+        border-title-align: center;
         padding: 1;
-    }
-
-    .widget-title {
-        text-style: bold;
-        color: $primary;
-        margin-bottom: 1;
+        background: $panel;
     }
     """
 
@@ -98,33 +118,41 @@ class AIDATui(App):
         with Horizontal(id="main-container"):
             # Left panel - Chat interface (2/3 width)
             with Vertical(id="left-panel"):
+                chat_container = Container(id="chat-container")
+                chat_container.border_title = "Interactive Chat"
                 self.chat_widget = ChatWidget()
-                yield self.chat_widget
+                yield chat_container
 
             # Right panel - Monitoring widgets (1/3 width)
             with Vertical(id="right-panel"):
-                # Resource monitor (top third)
-                with Container(id="resource-monitor"):
-                    yield Static("MEMORY  CPU  GPU", classes="widget-title")
-                    self.resource_monitor = ResourceMonitor()
-                    yield self.resource_monitor
+                # System Information (top third)
+                resource_container = Container(id="resource-monitor")
+                resource_container.border_title = "System Information"
+                self.resource_monitor = ResourceMonitor()
+                yield resource_container
 
                 # Ongoing tasks (middle third)
-                with Container(id="tasks-widget"):
-                    yield Static("ONGOING TASKS", classes="widget-title")
-                    self.tasks_widget = TasksWidget()
-                    yield self.tasks_widget
+                tasks_container = Container(id="tasks-widget")
+                tasks_container.border_title = "Ongoing Tasks"
+                self.tasks_widget = TasksWidget()
+                yield tasks_container
 
                 # Available agents (bottom third)
-                with Container(id="agents-widget"):
-                    yield Static("AVAILABLE AGENTS", classes="widget-title")
-                    self.agents_widget = AgentsWidget()
-                    yield self.agents_widget
+                agents_container = Container(id="agents-widget")
+                agents_container.border_title = "Available Agents"
+                self.agents_widget = AgentsWidget()
+                yield agents_container
 
         yield Footer()
 
     async def on_mount(self) -> None:
-        """Initialize components when the app mounts."""
+        """Mount widgets to containers and initialize components."""
+        # Mount widgets to their containers
+        self.query_one("#chat-container").mount(self.chat_widget)
+        self.query_one("#resource-monitor").mount(self.resource_monitor)
+        self.query_one("#tasks-widget").mount(self.tasks_widget)
+        self.query_one("#agents-widget").mount(self.agents_widget)
+
         # Initialize chat session
         if self.chat_widget:
             await self.chat_widget.initialize()

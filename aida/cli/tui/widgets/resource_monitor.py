@@ -2,6 +2,7 @@
 
 import asyncio
 from collections import deque
+import secrets
 
 import psutil
 from rich.text import Text
@@ -21,8 +22,9 @@ class ResourceMonitor(Widget):
     }
 
     .resource-chart {
-        height: 8;
+        height: 100%;
         width: 100%;
+        padding: 1;
     }
     """
 
@@ -36,6 +38,11 @@ class ResourceMonitor(Widget):
         super().__init__()
         self.update_interval = 1.0  # Update every second
         self._monitoring = False
+        # Initialize with some data to avoid empty charts
+        for _ in range(5):
+            self.cpu_history.append(0.0)
+            self.memory_history.append(0.0)
+            self.gpu_history.append(0.0)
 
     def compose(self) -> ComposeResult:
         """Create the resource monitor UI."""
@@ -78,45 +85,83 @@ class ResourceMonitor(Widget):
                     gpu_percent = float(result.stdout.strip())
                 except ValueError:
                     # Failed to parse, use simulation
-                    import random
-
-                    gpu_percent = random.uniform(20, 80) if len(self.gpu_history) > 0 else 30
+                    gpu_percent = secrets.randbelow(61) + 20 if len(self.gpu_history) > 0 else 30
             else:
                 # No NVIDIA GPU, simulate for demo
-                import random
-
-                gpu_percent = random.uniform(20, 80) if len(self.gpu_history) > 0 else 30
+                gpu_percent = secrets.randbelow(61) + 20 if len(self.gpu_history) > 0 else 30
         except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
             # GPU monitoring not available, simulate
-            import random
-
-            gpu_percent = random.uniform(20, 80) if len(self.gpu_history) > 0 else 30
+            gpu_percent = secrets.randbelow(61) + 20 if len(self.gpu_history) > 0 else 30
 
         self.gpu_history.append(gpu_percent)
 
         # Update display
         self.refresh()
 
-    def render_line_chart(self, data: list[float], height: int = 6, width: int = 40) -> list[str]:
-        """Render a simple ASCII line chart."""
+    def render_line_chart(
+        self, data: list[float], height: int = 6, width: int = 40, color: str = "green"
+    ) -> list[str]:
+        """Render a smooth ASCII line chart similar to dolphie style."""
         if not data:
             return [" " * width for _ in range(height)]
 
-        # Normalize data to chart height
-        max_val = max(data) if data else 100
-        min_val = min(data) if data else 0
-        range_val = max_val - min_val if max_val != min_val else 1
+        # Always use 0-100 range for percentages
+        # Create chart with axis
+        chart = [[" " for _ in range(width + 5)] for _ in range(height)]
 
-        # Create chart
-        chart = [[" " for _ in range(width)] for _ in range(height)]
+        # Add Y-axis labels (100%, 50%, 0%)
+        for y in range(height):
+            if y == 0:
+                chart[y][0:4] = list("100%")
+            elif y == height // 2:
+                chart[y][0:4] = list(" 50%")
+            elif y == height - 1:
+                chart[y][0:4] = list("  0%")
+            else:
+                chart[y][0:4] = list("    ")
 
-        # Plot points
-        for i, value in enumerate(data[-width:]):
+            # Add axis line
+            chart[y][4] = "│"
+
+        # Get data points for width
+        points = list(data)[-width:]
+
+        # Draw line chart using Unicode box drawing characters
+        for i in range(len(points)):
             if i < width:
-                normalized = (value - min_val) / range_val
-                y = int((1 - normalized) * (height - 1))
+                val = points[i]
+
+                # Normalize to chart height
+                y = int((1 - val / 100) * (height - 1))
                 y = max(0, min(height - 1, y))
-                chart[y][i] = "█"
+
+                # Plot point
+                chart[y][i + 5] = "•"
+
+                # Connect to previous point if exists
+                if i > 0:
+                    prev_val = points[i - 1]
+                    prev_y = int((1 - prev_val / 100) * (height - 1))
+                    prev_y = max(0, min(height - 1, prev_y))
+
+                    # Draw connecting line using appropriate characters
+                    if y != prev_y:
+                        if y > prev_y:
+                            # Line going down
+                            for dy in range(prev_y + 1, y):
+                                chart[dy][i + 5] = "│"
+                            chart[prev_y][i + 5] = "╮" if chart[prev_y][i + 5] == " " else "•"
+                            chart[y][i + 5] = "╯" if i < len(points) - 1 else "•"
+                        else:
+                            # Line going up
+                            for dy in range(y + 1, prev_y):
+                                chart[dy][i + 5] = "│"
+                            chart[prev_y][i + 5] = "╰" if chart[prev_y][i + 5] == " " else "•"
+                            chart[y][i + 5] = "╭" if i < len(points) - 1 else "•"
+                    else:
+                        # Horizontal line
+                        if i > 0 and chart[y][i + 4] == " ":
+                            chart[y][i + 4] = "─"
 
         # Convert to strings
         return ["".join(row) for row in chart]
@@ -130,20 +175,54 @@ class ResourceMonitor(Widget):
         mem_current = self.memory_history[-1] if self.memory_history else 0
         gpu_current = self.gpu_history[-1] if self.gpu_history else 0
 
-        # Render charts side by side
-        cpu_chart = self.render_line_chart(list(self.cpu_history), height=5, width=12)
-        mem_chart = self.render_line_chart(list(self.memory_history), height=5, width=12)
-        gpu_chart = self.render_line_chart(list(self.gpu_history), height=5, width=12)
+        # Render charts with appropriate width
+        width = 30  # Adjust based on panel width
+        height = 5  # Height for each chart
 
-        # Combine charts
-        for i in range(5):
-            line = f"{cpu_chart[i]} {mem_chart[i]} {gpu_chart[i]}"
-            output.append(line + "\n", style="green" if i < 2 else "yellow" if i < 4 else "red")
+        # Render all three charts
+        cpu_chart = self.render_line_chart(list(self.cpu_history), height=height, width=width)
+        mem_chart = self.render_line_chart(list(self.memory_history), height=height, width=width)
+        gpu_chart = self.render_line_chart(list(self.gpu_history), height=height, width=width)
 
-        # Add current values
-        output.append(f"CPU: {cpu_current:>3.0f}%  ", style="cyan")
-        output.append(f"MEM: {mem_current:>3.0f}%  ", style="magenta")
-        output.append(f"GPU: {gpu_current:>3.0f}%", style="yellow")
+        # Time axis (showing relative time markers)
+        time_axis = "     └" + "─" * width + "┘"
+        time_labels = (
+            "      -50s" + " " * (width // 2 - 8) + "-25s" + " " * (width // 2 - 6) + "now"
+        )
+
+        # CPU section
+        output.append("  CPU: ", style="bold cyan")
+        output.append(f"{cpu_current:>3.0f}%\n", style="bright_cyan")
+
+        for _i, line in enumerate(cpu_chart):
+            output.append(line, style="cyan")
+            output.append("\n")
+
+        output.append(time_axis + "\n", style="dim")
+        output.append(time_labels + "\n", style="dim")
+
+        # Memory section
+        output.append("\n  MEM: ", style="bold blue")
+        output.append(f"{mem_current:>3.0f}%\n", style="bright_blue")
+
+        for _i, line in enumerate(mem_chart):
+            output.append(line, style="blue")
+            output.append("\n")
+
+        output.append(time_axis + "\n", style="dim")
+        output.append(time_labels + "\n", style="dim")
+
+        # GPU section
+        output.append("\n  GPU: ", style="bold yellow")
+        output.append(f"{gpu_current:>3.0f}%\n", style="bright_yellow")
+
+        for _i, line in enumerate(gpu_chart):
+            output.append(line, style="yellow")
+            output.append("\n")
+
+        output.append(time_axis, style="dim")
+        output.append("\n")
+        output.append(time_labels, style="dim")
 
         return output
 

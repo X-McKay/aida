@@ -1,5 +1,6 @@
 """Chat widget for AIDA TUI."""
 
+import asyncio
 from datetime import datetime
 
 from rich.text import Text
@@ -45,26 +46,40 @@ class ChatMessage(Static):
 class ChatWidget(Widget):
     """Chat interface widget."""
 
+    def __init__(self):
+        """Initialize the chat widget."""
+        super().__init__()
+        self._last_input_time = 0
+        self._input_debounce = 0.1  # 100ms debounce for input events
+
     CSS = """
     ChatWidget {
         height: 100%;
         layout: vertical;
     }
 
-    #chat-container {
+    #messages-container {
         height: 1fr;
         overflow-y: scroll;
         padding: 1;
+        margin-bottom: 1;
     }
 
     #chat-input {
         height: 3;
         dock: bottom;
-        margin: 0 1;
+        margin: 0 1 1 1;
+        border: solid $primary;
+        background: $surface;
     }
 
     ChatMessage {
         margin-bottom: 1;
+    }
+
+    .system-message {
+        color: $text-muted;
+        text-style: italic;
     }
     """
 
@@ -82,43 +97,66 @@ class ChatWidget(Widget):
         """Create the chat UI."""
         with Vertical():
             # Chat messages container
-            with ScrollableContainer(id="chat-container"):
+            with ScrollableContainer(id="messages-container"):
                 yield Static("Welcome to AIDA! Type your message below.", classes="system-message")
 
             # Input field with protection against automatic value changes
-            input_widget = Input(placeholder="How can I assist you today?", id="chat-input")
+            input_widget = Input(
+                placeholder="How can I assist you today?",
+                id="chat-input",
+                restrict=None,  # No input restrictions
+                max_length=1000,  # Reasonable limit
+            )
             # Ensure input starts empty
             input_widget.value = ""
             yield input_widget
 
     async def initialize(self) -> None:
         """Initialize the chat session."""
+        # Defer initialization messages until widget is mounted
+        messages = []
+
         # Initialize tools
         try:
             await initialize_default_tools()
-            self.post_system_message("Tools initialized successfully.")
+            messages.append(("system", "Tools initialized successfully."))
         except Exception as e:
-            self.post_system_message(f"Warning: Tool initialization failed: {e}")
+            messages.append(("system", f"Warning: Tool initialization failed: {e}"))
 
         # Check LLM
         try:
             manager = get_llm()
             purposes = manager.list_purposes()
             if purposes:
-                self.post_system_message(f"LLM ready with {len(purposes)} purposes.")
+                messages.append(("system", f"LLM ready with {len(purposes)} purposes."))
             else:
-                self.post_system_message("Warning: No LLM purposes available.")
+                messages.append(("system", "Warning: No LLM purposes available."))
         except Exception as e:
-            self.post_system_message(f"Warning: LLM check failed: {e}")
+            messages.append(("system", f"Warning: LLM check failed: {e}"))
+
+        # Post messages after a short delay to ensure widget is mounted
+        await asyncio.sleep(0.1)
+        for role, msg in messages:
+            self.add_message(role, msg)
 
     async def on_input_submitted(self, event: Input.Submitted) -> None:
         """Handle input submission."""
+        import time
+
+        # Debounce rapid submissions
+        current_time = time.time()
+        if current_time - self._last_input_time < self._input_debounce:
+            event.stop()
+            return
+        self._last_input_time = current_time
+
         message = event.value.strip()
         if not message:
             return
 
-        # Clear input
+        # Clear input immediately and prevent event propagation
         event.input.value = ""
+        event.stop()
 
         # Add user message
         self.add_message("user", message)
@@ -253,7 +291,7 @@ class ChatWidget(Widget):
         )
 
         # Add to UI
-        container = self.query_one("#chat-container")
+        container = self.query_one("#messages-container")
         message_widget = ChatMessage(role, content)
         container.mount(message_widget)
 
@@ -266,7 +304,7 @@ class ChatWidget(Widget):
 
     def clear_last_system_message(self) -> None:
         """Remove the last system message."""
-        container = self.query_one("#chat-container")
+        container = self.query_one("#messages-container")
         messages = list(container.query(ChatMessage))
 
         # Find and remove last system message
@@ -278,7 +316,7 @@ class ChatWidget(Widget):
     def clear_chat(self) -> None:
         """Clear all chat messages."""
         self.conversation_history.clear()
-        container = self.query_one("#chat-container")
+        container = self.query_one("#messages-container")
 
         # Remove all messages except welcome
         for message in container.query(ChatMessage):
@@ -289,3 +327,21 @@ class ChatWidget(Widget):
     def on_focus(self) -> None:
         """Focus the input when widget gets focus."""
         self.query_one("#chat-input").focus()
+
+    async def on_input_changed(self, event: Input.Changed) -> None:
+        """Monitor for unexpected input changes."""
+        # If the input has grown unexpectedly large, it might be the duplication bug
+        if len(event.value) > 100 and event.value.count(event.value[0]) == len(event.value):
+            # Clear the input if it looks like repeated characters
+            event.input.value = ""
+            event.stop()
+            return
+
+        # Additional check for rapid repeated characters
+        if len(event.value) > 10:
+            # Check if the last 10 characters are all the same
+            last_chars = event.value[-10:]
+            if len(set(last_chars)) == 1:
+                # Likely a bug, truncate to reasonable length
+                event.input.value = event.value[:-9]
+                event.stop()

@@ -48,7 +48,7 @@ class WebSearchConfig:
     IGNORED_WEBSITES = os.getenv("IGNORED_WEBSITES", "").split(",")
 
     @classmethod
-    def get_docker_args(cls, additional_env: dict[str, str] = None) -> list[str]:
+    def get_docker_args(cls, additional_env: dict[str, str] | None = None) -> list[str]:
         """Get Docker arguments for running SearXNG MCP server."""
         args = [
             "run",

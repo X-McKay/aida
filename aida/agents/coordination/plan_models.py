@@ -49,6 +49,7 @@ class TodoStep(BaseModel):
     completed_at: datetime | None = None
     retry_count: int = 0
     max_retries: int = 3
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for storage."""
@@ -92,6 +93,7 @@ class TodoPlan(BaseModel):
     plan_version: int = 1
     last_evaluated: datetime = Field(default_factory=datetime.utcnow)
     replan_history: list[dict[str, Any]] = Field(default_factory=list)
+    reflection_analysis: list[dict[str, Any]] = Field(default_factory=list)
 
     @property
     def status(self) -> str:

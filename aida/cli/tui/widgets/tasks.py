@@ -1,44 +1,160 @@
-"""Tasks widget for AIDA TUI."""
+"""Tasks widget for AIDA TUI - displays ongoing plans with clickable details."""
 
-from rich.text import Text
 from textual.app import ComposeResult
+from textual.containers import ScrollableContainer, Vertical
+from textual.message import Message
 from textual.reactive import reactive
 from textual.widget import Widget
-from textual.widgets import Static
+from textual.widgets import Button, Static
+
+from aida.core.orchestrator import get_orchestrator
 
 
-class TaskItem(Static):
-    """A single task item."""
+class PlanItem(Button):
+    """A clickable plan item that shows plan details when clicked."""
 
-    def __init__(self, task_id: str, description: str, status: str = "pending"):
-        """Initialize a task item."""
-        self.task_id = task_id
+    class Selected(Message):
+        """Message sent when a plan is selected."""
+
+        def __init__(self, plan_id: str, plan_data: dict):
+            """Initialize the Selected message."""
+            self.plan_id = plan_id
+            self.plan_data = plan_data
+            super().__init__()
+
+    def __init__(self, plan_id: str, status: str, description: str, progress: dict):
+        """Initialize a plan item."""
+        self.plan_id = plan_id
         self.status = status
+        self.description = description
+        self.progress = progress
 
-        # Format task display
-        status_symbol = "○" if status == "pending" else "●" if status == "running" else "✓"
-        status_color = (
-            "yellow" if status == "pending" else "green" if status == "running" else "dim green"
+        # Format status icon and color
+        status_icons = {
+            "pending": ("⏳", "yellow"),
+            "in_progress": ("🔄", "cyan"),
+            "completed": ("✅", "green"),
+            "failed": ("❌", "red"),
+            "cancelled": ("⏹", "dim"),
+        }
+
+        icon, color = status_icons.get(status, ("○", "white"))
+
+        # Create label with progress info
+        completed = progress.get("completed", 0)
+        total = progress.get("total", 0)
+        progress_text = f"[{completed}/{total}]" if total > 0 else ""
+
+        label = f"{icon} {plan_id} {progress_text} - {description[:40]}..."
+
+        super().__init__(label, variant="primary" if status == "in_progress" else "default")
+        self.tooltip = f"Click to view plan details for {plan_id}"
+
+    def on_button_pressed(self) -> None:
+        """Handle button press."""
+        # Post message to parent
+        self.post_message(
+            self.Selected(
+                self.plan_id,
+                {
+                    "status": self.status,
+                    "description": self.description,
+                    "progress": self.progress,
+                },
+            )
         )
 
-        content = Text()
-        content.append(f"{status_symbol} ", style=status_color)
-        content.append(description, style="white")
 
-        super().__init__(content)
+class PlanDetailsView(ScrollableContainer):
+    """Detailed view of a selected plan."""
+
+    def __init__(self, plan_id: str = "", plan_data: dict | None = None):
+        """Initialize the details view."""
+        super().__init__()
+        self.plan_id = plan_id
+        self.plan_data = plan_data or {}
+        self.can_focus = True
+
+    def compose(self) -> ComposeResult:
+        """Create the details view."""
+        if not self.plan_id:
+            yield Static("No plan selected", classes="no-selection")
+            return
+
+        with Vertical():
+            # Header
+            yield Static(f"Plan: {self.plan_id}", classes="plan-header")
+            yield Static(
+                f"Status: {self.plan_data.get('status', 'unknown')}", classes="plan-status"
+            )
+
+            # Progress
+            progress = self.plan_data.get("progress", {})
+            yield Static(
+                f"Progress: {progress.get('completed', 0)}/{progress.get('total', 0)} steps",
+                classes="plan-progress",
+            )
+
+            # Description
+            yield Static("\nDescription:", classes="section-header")
+            yield Static(
+                self.plan_data.get("description", "No description"), classes="plan-description"
+            )
+
+            # Steps
+            yield Static("\nSteps:", classes="section-header")
+
+            # Show actual plan steps if available
+            if "steps" in self.plan_data:
+                for i, step in enumerate(self.plan_data["steps"], 1):
+                    step_status = step.get("status", "pending")
+                    step_icon = (
+                        "✅"
+                        if step_status == "completed"
+                        else "🔄"
+                        if step_status == "in_progress"
+                        else "⏳"
+                    )
+                    yield Static(
+                        f"{i}. {step_icon} {step.get('description', 'Unknown step')}",
+                        classes="plan-step",
+                    )
+            else:
+                yield Static("Step details not available", classes="no-steps")
+
+            # Close button
+            yield Button("Close Details [ESC]", variant="primary", id="close-details")
 
 
 class TasksWidget(Widget):
-    """Widget for displaying ongoing tasks."""
+    """Widget for displaying ongoing plans with interactive details."""
 
     CSS = """
     TasksWidget {
         height: 100%;
-        overflow-y: auto;
+        layout: vertical;
     }
 
-    TaskItem {
+    #tasks-list {
+        height: 50%;
+        overflow-y: auto;
+        border-bottom: thick $primary;
+        padding-bottom: 1;
         margin-bottom: 1;
+    }
+
+    #plan-details {
+        height: 50%;
+        overflow-y: auto;
+        padding-top: 1;
+        background: $surface-darken-1;
+        border: solid $primary-darken-2;
+        padding: 1;
+    }
+
+    PlanItem {
+        margin-bottom: 1;
+        width: 100%;
     }
 
     .no-tasks {
@@ -46,87 +162,205 @@ class TasksWidget(Widget):
         text-align: center;
         margin-top: 2;
     }
+
+    .no-selection {
+        color: $text-disabled;
+        text-align: center;
+        margin-top: 2;
+    }
+
+    .plan-header {
+        text-style: bold;
+        color: $primary;
+    }
+
+    .plan-status {
+        color: $text;
+        margin-bottom: 1;
+    }
+
+    .plan-progress {
+        color: $accent;
+    }
+
+    .section-header {
+        text-style: bold;
+        color: $primary-lighten-2;
+        margin-top: 1;
+    }
+
+    .plan-description {
+        color: $text;
+        margin-left: 2;
+    }
+
+    .plan-step {
+        color: $text;
+        margin-left: 2;
+        margin-bottom: 1;
+    }
+
+    .no-steps {
+        color: $text-disabled;
+        margin-left: 2;
+    }
+
+    #close-details {
+        margin-top: 2;
+        width: 20;
+    }
     """
 
-    tasks: reactive[dict[str, dict]] = reactive({})
+    plans: reactive[dict[str, dict]] = reactive({})
+    selected_plan: reactive[str | None] = reactive(None)
 
     def compose(self) -> ComposeResult:
         """Create the tasks UI."""
-        # Start with empty message
-        yield Static("No active tasks", classes="no-tasks", id="no-tasks-message")
+        # List of plans
+        with ScrollableContainer(id="tasks-list"):
+            yield Static("No active plans", classes="no-tasks", id="no-tasks-message")
+
+        # Plan details view
+        with ScrollableContainer(id="plan-details"):
+            self.details_view = PlanDetailsView()
+            yield self.details_view
 
     def on_mount(self) -> None:
         """Initialize when mounted."""
-        # Start monitoring tasks
-        self.set_interval(2.0, self.update_tasks)
+        # Start monitoring plans
+        self.set_interval(2.0, self.update_plans)
 
-    async def update_tasks(self) -> None:
-        """Update task list from coordinator."""
+    async def update_plans(self) -> None:
+        """Update plan list from coordinator."""
         try:
-            # Try to get active tasks from coordinator
+            # Get orchestrator instance
+            orchestrator = get_orchestrator()
 
-            # This is a simplified version - in real implementation,
-            # we'd need a way to access the global coordinator instance
-            # For now, we'll simulate some tasks
-            await self.simulate_tasks()
+            # Get active plans
+            if hasattr(orchestrator, "coordinator") and orchestrator.coordinator:
+                coordinator = orchestrator.coordinator
+
+                # Get all active plans
+                active_plans = {}
+
+                # Check stored plans
+                if hasattr(coordinator, "_storage"):
+                    stored_plans = coordinator._storage.list_plans(status="active")
+                    for plan_summary in stored_plans:
+                        plan_id = plan_summary["id"]
+                        plan = coordinator.load_plan(plan_id)
+                        if plan:
+                            active_plans[plan_id] = {
+                                "status": plan.status,
+                                "description": plan.user_request,
+                                "progress": plan.get_progress(),
+                                "steps": [
+                                    {
+                                        "description": step.description,
+                                        "status": step.status.value,
+                                    }
+                                    for step in plan.steps
+                                ],
+                            }
+
+                # Update if changed
+                if self.plans != active_plans:
+                    self.plans = active_plans
+                    self.refresh_plan_display()
 
         except Exception:
-            # If coordinator not available, show demo tasks
-            await self.simulate_tasks()
+            # If coordinator not available, show demo plans
+            await self.simulate_plans()
 
-    async def simulate_tasks(self) -> None:
-        """Simulate some tasks for demo purposes."""
-        # Demo tasks that cycle through states
-        demo_tasks = {
-            "task_001": {"description": "Data analysis", "status": "running"},
-            "task_002": {"description": "Web scraping", "status": "pending"},
-            "task_003": {"description": "Document summarization", "status": "completed"},
+    async def simulate_plans(self) -> None:
+        """Simulate some plans for demo purposes."""
+        # Demo plans
+        demo_plans = {
+            "plan_001_demo": {
+                "status": "in_progress",
+                "description": "Analyze Python codebase and generate documentation",
+                "progress": {"completed": 2, "total": 4, "failed": 0},
+                "steps": [
+                    {"description": "Scan codebase structure", "status": "completed"},
+                    {"description": "Analyze code complexity", "status": "completed"},
+                    {"description": "Generate API documentation", "status": "in_progress"},
+                    {"description": "Create usage examples", "status": "pending"},
+                ],
+            },
+            "plan_002_demo": {
+                "status": "pending",
+                "description": "Research and summarize recent AI papers",
+                "progress": {"completed": 0, "total": 3, "failed": 0},
+                "steps": [
+                    {"description": "Search arxiv for papers", "status": "pending"},
+                    {"description": "Download and parse PDFs", "status": "pending"},
+                    {"description": "Generate summary report", "status": "pending"},
+                ],
+            },
         }
 
         # Update if changed
-        if self.tasks != demo_tasks:
-            self.tasks = demo_tasks
-            self.refresh_task_display()
+        if self.plans != demo_plans:
+            self.plans = demo_plans
+            self.refresh_plan_display()
 
-    def add_task(self, task_id: str, description: str, status: str = "pending") -> None:
-        """Add a new task to the display."""
-        self.tasks[task_id] = {"description": description, "status": status}
-        self.refresh_task_display()
+    def refresh_plan_display(self) -> None:
+        """Refresh the plan display."""
+        # Get the list container
+        list_container = self.query_one("#tasks-list", ScrollableContainer)
 
-    def update_task_status(self, task_id: str, status: str) -> None:
-        """Update the status of a task."""
-        if task_id in self.tasks:
-            self.tasks[task_id]["status"] = status
-            self.refresh_task_display()
-
-    def remove_task(self, task_id: str) -> None:
-        """Remove a task from the display."""
-        if task_id in self.tasks:
-            del self.tasks[task_id]
-            self.refresh_task_display()
-
-    def refresh_task_display(self) -> None:
-        """Refresh the task display."""
-        # Clear current display
-        for widget in self.query(TaskItem):
+        # Clear current display (except no-tasks message)
+        for widget in list_container.query(PlanItem):
             widget.remove()
 
         no_tasks_msg = self.query_one("#no-tasks-message", Static)
 
-        if self.tasks:
+        if self.plans:
             # Hide no tasks message
             no_tasks_msg.display = False
 
-            # Add task items
-            for task_id, task_info in self.tasks.items():
-                task_item = TaskItem(
-                    task_id, task_info["description"], task_info.get("status", "pending")
+            # Add plan items
+            for plan_id, plan_info in self.plans.items():
+                plan_item = PlanItem(
+                    plan_id,
+                    plan_info["status"],
+                    plan_info["description"],
+                    plan_info.get("progress", {}),
                 )
-                self.mount(task_item)
+                list_container.mount(plan_item)
         else:
             # Show no tasks message
             no_tasks_msg.display = True
 
-    def get_active_task_count(self) -> int:
-        """Get count of active (non-completed) tasks."""
-        return sum(1 for task in self.tasks.values() if task.get("status") != "completed")
+    def on_plan_item_selected(self, message: PlanItem.Selected) -> None:
+        """Handle plan selection."""
+        self.selected_plan = message.plan_id
+
+        # Get full plan data
+        plan_data = self.plans.get(message.plan_id, message.plan_data)
+
+        # Update details view
+        details_container = self.query_one("#plan-details", ScrollableContainer)
+        details_container.remove_children()
+
+        # Create new details view
+        self.details_view = PlanDetailsView(message.plan_id, plan_data)
+        details_container.mount(self.details_view)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Handle button presses."""
+        if event.button.id == "close-details":
+            # Clear selection and show empty details
+            self.selected_plan = None
+            details_container = self.query_one("#plan-details", ScrollableContainer)
+            details_container.remove_children()
+            self.details_view = PlanDetailsView()
+            details_container.mount(self.details_view)
+
+    def get_active_plan_count(self) -> int:
+        """Get count of active (non-completed) plans."""
+        return sum(
+            1
+            for plan in self.plans.values()
+            if plan.get("status") not in ["completed", "cancelled"]
+        )

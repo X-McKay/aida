@@ -93,3 +93,32 @@ class LLMManager:
             except Exception:
                 health[purpose] = False
         return health
+
+    async def agenerate(
+        self,
+        prompt: str,
+        purpose: Purpose = Purpose.DEFAULT,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ) -> str:
+        """Generate text using specified purpose model.
+
+        This method provides compatibility for components expecting agenerate.
+
+        Args:
+            prompt: The prompt to generate from
+            purpose: The purpose to use for generation
+            temperature: Optional temperature override
+            max_tokens: Optional max tokens override
+
+        Returns:
+            Generated text
+        """
+        agent = self._agents.get(purpose)
+        if not agent:
+            raise ValueError(f"No agent configured for purpose: {purpose}")
+
+        # For now, use the chat method which internally uses the agent
+        # In the future, we could customize settings per request
+        result = await self.chat(prompt, purpose=purpose)
+        return result

@@ -8,7 +8,7 @@ TODO: Update all code to use the new agent system directly and remove this.
 
 import asyncio
 import logging
-from typing import Any
+from typing import Any, cast
 
 logger = logging.getLogger(__name__)
 
@@ -62,12 +62,17 @@ class TodoOrchestrator:
             self.worker = CodingWorker("legacy_worker")
             await self.worker.start()
 
+            # For local operation, directly register the worker with the coordinator
+            # This bypasses the A2A registration for in-process operation
+            self.coordinator._known_workers[self.worker.agent_id] = self.worker
+            await self.coordinator._update_dispatcher()
+
             # Wait for registration
-            await asyncio.sleep(1)
+            await asyncio.sleep(0.5)
             self._initialized = True
 
     async def execute_request(
-        self, request: Any, context: dict[str, Any] = None, **kwargs
+        self, request: Any, context: dict[str, Any] | None = None, **kwargs
     ) -> dict[str, Any]:
         """Execute request using coordinator - handles both string and dict formats."""
         await self._ensure_initialized()
@@ -118,7 +123,7 @@ class TodoOrchestrator:
         return loop.run_until_complete(self.execute_request(request))
 
     async def create_plan(
-        self, user_request: str, context: dict[str, Any] = None
+        self, user_request: str, context: dict[str, Any] | None = None
     ) -> dict[str, Any]:
         """Create a plan for a user request - compatibility method."""
         logger.warning(
@@ -128,7 +133,13 @@ class TodoOrchestrator:
         return {
             "status": "success",
             "message": "Planning is now integrated into execute_request",
-            "plan": TodoPlan(plan_id="dummy", user_request=user_request, steps=[]),
+            "plan": TodoPlan(
+                id="dummy",
+                user_request=user_request,
+                analysis="Deprecated method - planning integrated into execute_request",
+                expected_outcome="N/A",
+                steps=[],
+            ),
         }
 
     async def shutdown(self):
@@ -153,7 +164,8 @@ def get_todo_orchestrator(storage_dir: str | None = None) -> TodoOrchestrator:
     if _coordinator_instance is None:
         _coordinator_instance = TodoOrchestrator(storage_dir)
 
-    return _coordinator_instance
+    # Type checker needs explicit cast
+    return cast(TodoOrchestrator, _coordinator_instance)
 
 
 # Alias for consistency

@@ -14,6 +14,7 @@ from mcp.types import (
     ReadResourceResult,
     TextContent,
 )
+from pydantic import AnyUrl
 
 from .models import SearchCategory, SearchOperation
 from .websearch import WebSearchTool
@@ -130,20 +131,22 @@ class WebSearchMCPServer:
 
             else:
                 return CallToolResult(
-                    content=[TextContent(text=f"Unknown tool: {tool_name}")],
+                    content=[TextContent(type="text", text=f"Unknown tool: {tool_name}")],
                     isError=True,
                 )
 
             if result.status.value == "completed":
-                return CallToolResult(content=[TextContent(text=str(result.result))], isError=False)
+                return CallToolResult(
+                    content=[TextContent(type="text", text=str(result.result))], isError=False
+                )
             else:
                 return CallToolResult(
-                    content=[TextContent(text=f"Error: {result.error}")], isError=True
+                    content=[TextContent(type="text", text=f"Error: {result.error}")], isError=True
                 )
 
         except Exception as e:
             return CallToolResult(
-                content=[TextContent(text=f"Error executing tool: {str(e)}")],
+                content=[TextContent(type="text", text=f"Error executing tool: {str(e)}")],
                 isError=True,
             )
 
@@ -151,13 +154,13 @@ class WebSearchMCPServer:
         """List available resources."""
         resources = [
             Resource(
-                uri="websearch://config",
+                uri=AnyUrl("websearch://config"),
                 name="Web Search Configuration",
                 description="Current web search configuration",
                 mimeType="application/json",
             ),
             Resource(
-                uri="websearch://stats",
+                uri=AnyUrl("websearch://stats"),
                 name="Search Statistics",
                 description="Web search usage statistics",
                 mimeType="application/json",
@@ -189,7 +192,7 @@ class WebSearchMCPServer:
             }
 
             return ReadResourceResult(
-                contents=[TextContent(text=str(config_data))],
+                contents=[TextContent(type="text", text=str(config_data))],
             )
 
         elif uri == "websearch://stats":
@@ -203,12 +206,12 @@ class WebSearchMCPServer:
             }
 
             return ReadResourceResult(
-                contents=[TextContent(text=str(stats))],
+                contents=[TextContent(type="text", text=str(stats))],
             )
 
         else:
             return ReadResourceResult(
-                contents=[TextContent(text=f"Unknown resource: {uri}")],
+                contents=[TextContent(type="text", text=f"Unknown resource: {uri}")],
             )
 
     async def run(self):

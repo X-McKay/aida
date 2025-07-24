@@ -71,8 +71,7 @@ class TaskExecutor(Protocol):
 
 
 class TaskDispatcher:
-    """
-    Handles task assignment, execution, retry logic, and observability.
+    """Handles task assignment, execution, retry logic, and observability.
 
     This class encapsulates the logic for:
     - Selecting appropriate agents for tasks
@@ -153,9 +152,10 @@ class TaskDispatcher:
             return next(iter(self.agents.values()))
 
         elif self.dispatch_strategy == DispatchStrategy.RANDOM:
-            import random
+            import secrets
 
-            return random.choice(list(self.agents.values()))
+            agents_list = list(self.agents.values())
+            return agents_list[secrets.randbelow(len(agents_list))]
 
         else:
             # Default to first agent

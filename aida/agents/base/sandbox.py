@@ -8,9 +8,15 @@ from dataclasses import dataclass, field
 from enum import Enum
 import logging
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import dagger
+if TYPE_CHECKING:
+    import dagger
+else:
+    try:
+        import dagger
+    except ImportError:
+        dagger = None
 
 logger = logging.getLogger(__name__)
 
@@ -165,7 +171,7 @@ class SandboxConfig:
 class SandboxBuilder:
     """Builder for creating Dagger containers from sandbox configuration."""
 
-    def __init__(self, dagger_client: dagger.Client):
+    def __init__(self, dagger_client: "dagger.Client"):
         """Initialize the sandbox builder.
 
         Args:
@@ -173,7 +179,7 @@ class SandboxBuilder:
         """
         self.client = dagger_client
 
-    async def build_container(self, config: SandboxConfig) -> dagger.Container:
+    async def build_container(self, config: SandboxConfig) -> "dagger.Container":
         """Build a Dagger container from sandbox configuration.
 
         Args:
@@ -190,9 +196,9 @@ class SandboxBuilder:
         container = self.client.container().from_(config.base_image)
 
         # Apply resource limits
-        resource_opts = config.resource_limits.to_dagger_opts()
         # Note: Dagger API for resource limits may vary by version
         # Skipping for now as it's not critical for testing
+        # resource_opts = config.resource_limits.to_dagger_opts()
 
         # Create user and group
         container = await self._setup_user(container, config)
@@ -228,8 +234,8 @@ class SandboxBuilder:
         return container
 
     async def _setup_user(
-        self, container: dagger.Container, config: SandboxConfig
-    ) -> dagger.Container:
+        self, container: "dagger.Container", config: SandboxConfig
+    ) -> "dagger.Container":
         """Set up user and group in container."""
         # Create group
         container = container.with_exec(
@@ -258,8 +264,8 @@ class SandboxBuilder:
         return container
 
     async def _setup_filesystem(
-        self, container: dagger.Container, config: SandboxConfig
-    ) -> dagger.Container:
+        self, container: "dagger.Container", config: SandboxConfig
+    ) -> "dagger.Container":
         """Set up filesystem mounts and permissions."""
         # Mount configured mount points
         for mount in config.mount_points:
@@ -278,8 +284,8 @@ class SandboxBuilder:
         return container
 
     async def _setup_network(
-        self, container: dagger.Container, config: SandboxConfig
-    ) -> dagger.Container:
+        self, container: "dagger.Container", config: SandboxConfig
+    ) -> "dagger.Container":
         """Set up network configuration."""
         if not config.resource_limits.network_enabled:
             # Disable network (this is simplified - real implementation
@@ -294,8 +300,8 @@ class SandboxBuilder:
         return container
 
     async def _mount_sockets(
-        self, container: dagger.Container, config: SandboxConfig
-    ) -> dagger.Container:
+        self, container: "dagger.Container", config: SandboxConfig
+    ) -> "dagger.Container":
         """Mount A2A and MCP sockets."""
         # Mount A2A socket
         container = container.with_unix_socket(
@@ -311,8 +317,8 @@ class SandboxBuilder:
         return container
 
     async def _apply_security(
-        self, container: dagger.Container, config: SandboxConfig
-    ) -> dagger.Container:
+        self, container: "dagger.Container", config: SandboxConfig
+    ) -> "dagger.Container":
         """Apply security settings to container."""
         # These are simplified versions - real implementation would use
         # proper security features

@@ -44,6 +44,13 @@ class WorkerCapability:
     """Information about a worker's capability."""
 
     def __init__(self, worker_id: str, capability: str, last_seen: float):
+        """Initialize worker capability tracking.
+
+        Args:
+            worker_id: ID of the worker
+            capability: Capability name
+            last_seen: Timestamp when last seen
+        """
         self.worker_id = worker_id
         self.capability = capability
         self.last_seen = last_seen
@@ -295,7 +302,6 @@ class CoordinatorAgent(BaseAgent):
             next_step = plan.get_next_executable_step()
             if not next_step:
                 # Check if we're done or stuck
-                progress = plan.get_progress()
                 if plan.status == "completed":
                     logger.info(f"Plan {plan.id} completed successfully")
                     # Run reflection analysis
@@ -607,7 +613,7 @@ class CoordinatorAgent(BaseAgent):
         """Handle task progress update from worker."""
         payload = message.payload
         task_id = payload["task_id"]
-        worker_id = payload["worker_id"]
+        # worker_id = payload["worker_id"]  # Currently unused
         progress = payload["progress_percentage"]
         status_message = payload["status_message"]
 
@@ -629,7 +635,7 @@ class CoordinatorAgent(BaseAgent):
 
         # Find the plan and step
         step_found = False
-        for plan_id, plan in self._active_plans.items():
+        for _plan_id, plan in self._active_plans.items():
             for step in plan.steps:
                 if step.id == task_id:
                     step_found = True
@@ -954,12 +960,10 @@ Example:
 
         # Load from storage
         plan = self._storage.load_plan(plan_id)
-        if plan:
+        if plan and plan.status not in ["completed", "failed"]:
             # Add to active plans if it's not completed
-            progress = plan.get_progress()
-            if plan.status not in ["completed", "failed"]:
-                self._active_plans[plan_id] = plan
-                self._plan_workers[plan_id] = {}
+            self._active_plans[plan_id] = plan
+            self._plan_workers[plan_id] = {}
 
         return plan
 
@@ -1188,18 +1192,18 @@ Example:
                         continue
 
                     # Check for completed plans
-                    progress = plan.get_progress()
-                    if plan.status in ["completed", "failed"]:
-                        # Keep completed plans for 5 minutes
-                        if (current_time - last_activity).total_seconds() > 300:
-                            logger.info(f"Archiving completed plan {plan_id}")
-                            # Archive completed plans
-                            if plan.status == "completed":
-                                self._storage.move_plan(plan_id, "archived")
-                            else:
-                                self._storage.move_plan(plan_id, "failed")
-                            del self._active_plans[plan_id]
-                            del self._plan_workers[plan_id]
+                    if (
+                        plan.status in ["completed", "failed"]
+                        and (current_time - last_activity).total_seconds() > 300
+                    ):
+                        logger.info(f"Archiving completed plan {plan_id}")
+                        # Archive completed plans
+                        if plan.status == "completed":
+                            self._storage.move_plan(plan_id, "archived")
+                        else:
+                            self._storage.move_plan(plan_id, "failed")
+                        del self._active_plans[plan_id]
+                        del self._plan_workers[plan_id]
 
                 await asyncio.sleep(30)  # Check every 30 seconds
 
